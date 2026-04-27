@@ -1,0 +1,18 @@
+{
+  "$schema": "https://rcade.dev/manifest.schema.json",
+  "name": "versus-shapes",
+  "display_name": "Versus Shapes",
+  "description": "a jazzy 3D Super Hexagon clone",
+  "visibility": "private",
+  "authors": [
+    {
+      "display_name": "Dan K"
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "@rcade/input-classic",
+      "version": "1.0.0"
+    }
+  ]
+}
