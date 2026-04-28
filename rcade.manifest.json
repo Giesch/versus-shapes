@@ -3,7 +3,7 @@
   "name": "versus-shapes",
   "display_name": "Versus Shapes",
   "description": "a jazzy 3D Super Hexagon clone",
-  "visibility": "private",
+  "visibility": "internal",
   "authors": [
     {
       "display_name": "Dan K"
