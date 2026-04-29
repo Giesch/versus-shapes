@@ -94,9 +94,9 @@ export class Renderer {
     this.boxCount = 1;
 
     // upload static spheres once; per-frame box upload happens in draw()
-    this.spheresBuffer.patch({
-      0: makeSphere(vec3.create(0, 0, 0), 1.0, vec3.create(0.2, 0.2, 0.6)),
-    });
+    this.spheresBuffer.patch([
+      makeSphere(vec3.create(0, 0, 0), 1.0, vec3.create(0.2, 0.2, 0.6)),
+    ]);
   }
 
   public static async init(): Promise<Renderer> {
@@ -236,9 +236,11 @@ export class Renderer {
         position: d.vec3f(eye[0], eye[1], eye[2]),
       },
       lightPosition: d.vec3f(sunPos[0], sunPos[1], sunPos[2]),
+
       pyramidCount: this.pyramidCount,
       sphereCount: this.sphereCount,
       boxCount: this.boxCount,
+
       resolution: d.vec2f(width, height),
     });
 
@@ -251,13 +253,14 @@ export class Renderer {
       mat4.multiply(localRot, translation),
       orbitRot,
     );
-    this.boxesBuffer.patch({
-      0: makeBox(
+
+    this.boxesBuffer.patch([
+      makeBox(
         boxTransform,
         vec3.create(0.2, 0.2, 0.2),
         vec3.create(0.2, 0.6, 0.2),
       ),
-    });
+    ]);
 
     this.pipeline
       .withColorAttachment({
