@@ -22,6 +22,7 @@ import {
   SpheresArray,
   BoxesArray,
   sdfLayout,
+  PyramidsArray,
 } from "./shaders/schemas";
 import { mainVertex } from "./shaders/vertex";
 import { mainFragment } from "./shaders/fragment";
@@ -71,6 +72,7 @@ export class Renderer {
 
   // CPU-side scene state
   invViewProj: Float32Array;
+  pyramidCount: number;
   sphereCount: number;
   boxCount: number;
 
@@ -87,6 +89,7 @@ export class Renderer {
     this.boxesBuffer = deps.boxesBuffer;
 
     this.invViewProj = new Float32Array(16);
+    this.pyramidCount = 0;
     this.sphereCount = 1;
     this.boxCount = 1;
 
@@ -128,11 +131,13 @@ export class Renderer {
     const root = tgpu.initFromDevice({ device });
 
     const paramsBuffer = root.createBuffer(RayMarchingParams).$usage("uniform");
+    const pyramidsBuffer = root.createBuffer(PyramidsArray).$usage("storage");
     const spheresBuffer = root.createBuffer(SpheresArray).$usage("storage");
     const boxesBuffer = root.createBuffer(BoxesArray).$usage("storage");
 
     const bindGroup = root.createBindGroup(sdfLayout, {
       params: paramsBuffer,
+      pyramids: pyramidsBuffer,
       spheres: spheresBuffer,
       boxes: boxesBuffer,
     });
@@ -231,6 +236,7 @@ export class Renderer {
         position: d.vec3f(eye[0], eye[1], eye[2]),
       },
       lightPosition: d.vec3f(sunPos[0], sunPos[1], sunPos[2]),
+      pyramidCount: this.pyramidCount,
       sphereCount: this.sphereCount,
       boxCount: this.boxCount,
       resolution: d.vec2f(width, height),

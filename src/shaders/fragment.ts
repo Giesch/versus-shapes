@@ -14,6 +14,9 @@ const RayHit = d.struct({
   color: d.vec3f,
 });
 
+// Inigo Quilez's 3D SDF reference
+// https://iquilezles.org/articles/distfunctions
+
 const sphereSdf = (p: d.v3f, s: d.Infer<typeof Sphere>): number => {
   "use gpu";
 
@@ -32,10 +35,46 @@ const boxSdf = (p: d.v3f, b: d.Infer<typeof BoxRect>): number => {
   );
 };
 
+// https://www.shadertoy.com/view/Ws3SDl
+// this looks different from the original glsl,
+// because wgsl uses immutable params, and doesn't support writing to swizzles
+const pyramidSdf = (p: d.v3f, h: number) => {
+  "use gpu";
+
+  const m2 = h * h + d.f32(0.25);
+
+  let pp = d.vec3f(std.abs(p.x), p.y, std.abs(p.z));
+  if (p.z > p.x) {
+    pp = d.vec3f(pp.z, pp.y, pp.x);
+  }
+  pp = d.vec3f(pp.x - 0.5, pp.y, pp.z - 0.5);
+
+  const q = d.vec3f(pp.z, h * pp.y - 0.5 * pp.x, h * pp.x + 0.5 * pp.y);
+  const s = std.max(-q.x, 0.0);
+  const t = std.clamp((q.y - 0.5 * pp.z) / (m2 + 0.25), 0.0, 1.0);
+  const a = m2 * (q.x + s) * (q.x + s) + q.y * q.y;
+  const b =
+    m2 * (q.x + 0.5 * t) * (q.x + 0.5 * t) + (q.y - m2 * t) * (q.y - m2 * t);
+
+  let d2 = 0.0;
+  if (std.min(q.y, -q.x * m2 - q.y * 0.5) <= 0.0) {
+    d2 = std.min(a, b);
+  }
+  return std.sqrt((d2 + q.z * q.z) / m2) * std.sign(std.max(q.z, -p.y));
+};
+
 const closestShape = (p: d.v3f): d.Infer<typeof RayHit> => {
   "use gpu";
 
   let hit = RayHit({ distance: MISS_DISTANCE, color: d.vec3f(0, 0, 0) });
+
+  for (let i = d.u32(0); i < sdfLayout.$.params.pyramidCount; i++) {
+    const pyramid = sdfLayout.$.pyramids[i];
+    const dist = pyramidSdf(p, pyramid.height);
+    if (dist < hit.distance) {
+      hit = RayHit({ distance: dist, color: pyramid.color });
+    }
+  }
 
   for (let i = d.u32(0); i < sdfLayout.$.params.sphereCount; i++) {
     const s = sdfLayout.$.spheres[i];
