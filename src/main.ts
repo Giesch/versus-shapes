@@ -3,9 +3,9 @@ import "./style.css";
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
 
 import { Renderer } from "./renderer";
+import * as audio from "./audio";
 
 const MILLIS_PER_FRAME = 16.6;
-const SOUND_EFFECT_COOLDOWN_MS = 500;
 
 /** initial dependencies to construct a GameState */
 interface GameStateDeps {
@@ -13,6 +13,11 @@ interface GameStateDeps {
   lastTimeMillis: number;
   audioCtx: AudioContext;
   renderer: Renderer;
+  assets: Assets;
+}
+
+interface Assets {
+  versusShapes: AudioBuffer;
 }
 
 /** global state passed in to each update */
@@ -34,6 +39,7 @@ class GameState {
   // IO
   audioCtx: AudioContext;
   renderer: Renderer;
+  assets: Assets;
 
   constructor(deps: GameStateDeps) {
     this.startTimeMillis = deps.startTimeMillis;
@@ -42,6 +48,7 @@ class GameState {
 
     this.audioCtx = deps.audioCtx;
     this.renderer = deps.renderer;
+    this.assets = deps.assets;
   }
 
   update(input: FrameInput): void {
@@ -52,7 +59,6 @@ class GameState {
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
-      // TODO move into renderer method, making camera private?
       this.renderer.camera.applyInput({
         pitchUp: input.playerOne.DPAD.up,
         pitchDown: input.playerOne.DPAD.down,
@@ -61,13 +67,6 @@ class GameState {
         zoomIn: input.playerOne.A,
         zoomOut: input.playerOne.B,
       });
-    }
-  }
-
-  tryPlaySoundEffect(input: boolean, soundEffect: SoundEffect): void {
-    if (input && soundEffect.cooldown <= 0.0) {
-      this.playAudio(soundEffect.buffer);
-      soundEffect.cooldown = SOUND_EFFECT_COOLDOWN_MS;
     }
   }
 
@@ -84,19 +83,11 @@ class GameState {
   }
 }
 
-class SoundEffect {
-  buffer: AudioBuffer;
-  /** millis until we can play the sound effect again */
-  cooldown: number;
-
-  constructor(buffer: AudioBuffer) {
-    this.buffer = buffer;
-    this.cooldown = 0.0;
-  }
-}
-
 async function init() {
   const audioCtx = new AudioContext();
+  const versusShapes = await audio.load(audioCtx, "./versus-shapes.mp3");
+  const assets: Assets = { versusShapes };
+
   const renderer = await Renderer.init();
 
   const startTimeMillis = performance.now();
@@ -105,7 +96,10 @@ async function init() {
     lastTimeMillis: startTimeMillis,
     audioCtx,
     renderer,
+    assets,
   });
+
+  game.playAudio(game.assets.versusShapes);
 
   const frame = () => {
     const now = performance.now();
