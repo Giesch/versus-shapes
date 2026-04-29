@@ -56,7 +56,7 @@ const pyramidSdf = (p: d.v3f, h: number) => {
   const b =
     m2 * (q.x + 0.5 * t) * (q.x + 0.5 * t) + (q.y - m2 * t) * (q.y - m2 * t);
 
-  let d2 = 0.0;
+  let d2 = d.f32(0.0);
   if (std.min(q.y, -q.x * m2 - q.y * 0.5) <= 0.0) {
     d2 = std.min(a, b);
   }
@@ -198,7 +198,7 @@ export const mainFragment = tgpu.fragmentFn({
   let sum = d.vec3f(0, 0, 0);
   for (let m = 0; m < SSAA_N; m++) {
     for (let n = 0; n < SSAA_N; n++) {
-      const sub = d.vec2f((m + 0.5) / SSAA_N, (n + 0.5) / SSAA_N);
+      const sub = d.vec2f((d.f32(m) + 0.5) / SSAA_N, (d.f32(n) + 0.5) / SSAA_N);
       const offset = sub.sub(d.vec2f(0.5, 0.5)).mul(pixelNdc);
       sum = sum.add(sampleAt(input.ndc.add(offset)));
     }
