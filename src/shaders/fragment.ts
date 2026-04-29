@@ -2,7 +2,7 @@ import tgpu from "typegpu";
 import * as d from "typegpu/data";
 import * as std from "typegpu/std";
 
-import { sdfLayout, Sphere, BoxRect } from "./schemas";
+import { sdfLayout, Sphere, Box } from "./schemas";
 
 const MAX_STEPS = 64;
 const MAX_DISTANCE = d.f32(1000);
@@ -23,7 +23,7 @@ const sphereSdf = (p: d.v3f, s: d.Infer<typeof Sphere>): number => {
   return std.length(p.sub(s.center)) - s.radius;
 };
 
-const boxSdf = (p: d.v3f, b: d.Infer<typeof BoxRect>): number => {
+const boxSdf = (p: d.v3f, b: d.Infer<typeof Box>): number => {
   "use gpu";
 
   const local = b.transform.mul(d.vec4f(p, 1)).xyz;

@@ -2,10 +2,17 @@ import "./style.css";
 
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
 
-import { Renderer } from "./renderer";
+import { Renderer, mat4x4fFromArray, type DrawArgs } from "./renderer";
 import * as audio from "./audio";
+import { mat4, vec3, type Mat4, type Vec3 } from "wgpu-matrix";
+import { d } from "typegpu";
 
 const MILLIS_PER_FRAME = 16.6;
+
+const TAU = Math.PI * 2;
+const MOON_START = vec3.create(1, 0, 1);
+const SUN_START = vec3.create(4, 5, 2);
+const frac = (x: number): number => x - Math.floor(x);
 
 /** initial dependencies to construct a GameState */
 interface GameStateDeps {
@@ -41,6 +48,9 @@ class GameState {
   renderer: Renderer;
   assets: Assets;
 
+  sunPos: Vec3;
+  boxTransform: Mat4;
+
   constructor(deps: GameStateDeps) {
     this.startTimeMillis = deps.startTimeMillis;
     this.lastTimeMillis = deps.lastTimeMillis;
@@ -49,6 +59,9 @@ class GameState {
     this.audioCtx = deps.audioCtx;
     this.renderer = deps.renderer;
     this.assets = deps.assets;
+
+    this.sunPos = vec3.clone(SUN_START);
+    this.boxTransform = mat4.identity();
   }
 
   update(input: FrameInput): void {
@@ -67,6 +80,23 @@ class GameState {
         zoomIn: input.playerOne.A,
         zoomOut: input.playerOne.B,
       });
+
+      const elapsedSeconds = (input.now - this.startTimeMillis) / 1000;
+      const slowElapsed = elapsedSeconds * 0.1;
+
+      // update sun orbit
+      const sunRotation = mat4.rotationY(TAU * frac(slowElapsed * 0.25));
+      vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
+
+      // update cube orbit
+      const localRot = mat4.rotationZ(TAU * frac(2 * slowElapsed));
+      const translation = mat4.translation(MOON_START);
+      const orbitRot = mat4.rotationY(TAU * frac(slowElapsed));
+      mat4.multiply(
+        mat4.multiply(localRot, translation),
+        orbitRot,
+        this.boxTransform,
+      );
     }
   }
 
@@ -78,8 +108,32 @@ class GameState {
   }
 
   draw(now: number): void {
+    // TODO  share with update?
     const elapsedSeconds = (now - this.startTimeMillis) / 1000;
-    this.renderer.draw({ elapsedSeconds });
+
+    const pyramids: DrawArgs["pyramids"] = [];
+    const spheres: DrawArgs["spheres"] = [
+      {
+        center: d.vec3f(0.0, 0.0, 0.0),
+        radius: 1.0,
+        color: d.vec3f(0.2, 0.2, 0.6),
+      },
+    ];
+    const boxes = [
+      {
+        transform: mat4x4fFromArray(this.boxTransform),
+        radii: d.vec3f(0.2, 0.2, 0.2),
+        color: d.vec3f(0.2, 0.6, 0.2),
+      },
+    ];
+
+    this.renderer.draw({
+      elapsedSeconds,
+      lightPosition: this.sunPos,
+      pyramids,
+      spheres,
+      boxes,
+    });
   }
 }
 

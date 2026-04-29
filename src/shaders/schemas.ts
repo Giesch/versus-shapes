@@ -25,7 +25,7 @@ export const Sphere = d.struct({
   color: d.vec3f,
 });
 
-export const BoxRect = d.struct({
+export const Box = d.struct({
   transform: d.mat4x4f,
   radii: d.vec3f,
   color: d.vec3f,
@@ -38,7 +38,7 @@ export const Pyramid = d.struct({
 });
 
 export const SpheresArray = d.arrayOf(Sphere, MAX_SPHERES);
-export const BoxesArray = d.arrayOf(BoxRect, MAX_BOXES);
+export const BoxesArray = d.arrayOf(Box, MAX_BOXES);
 export const PyramidsArray = d.arrayOf(Pyramid, MAX_PYRAMIDS);
 
 export const sdfLayout = tgpu.bindGroupLayout({

@@ -1,4 +1,4 @@
-import { mat4, vec3 } from "wgpu-matrix";
+import { mat4, vec3, type Vec3 } from "wgpu-matrix";
 import tgpu, {
   type TgpuRoot,
   type TgpuRenderPipeline,
@@ -16,21 +16,18 @@ import {
 } from "./util";
 
 import { Camera } from "./camera";
-import { makeSphere, makeBox, mat4x4fFromArray } from "./scene";
 import {
   RayMarchingParams,
   SpheresArray,
   BoxesArray,
   sdfLayout,
   PyramidsArray,
+  Sphere,
+  Pyramid,
+  Box,
 } from "./shaders/schemas";
 import { mainVertex } from "./shaders/vertex";
 import { mainFragment } from "./shaders/fragment";
-
-const TAU = Math.PI * 2;
-const MOON_START = vec3.create(1, 0, 1);
-const SUN_START = vec3.create(4, 5, 2);
-const frac = (x: number): number => x - Math.floor(x);
 
 type SdfPipeline = TgpuRenderPipeline<d.Vec4f>;
 type ParamsBuffer = TgpuBuffer<typeof RayMarchingParams> & UniformFlag;
@@ -55,6 +52,10 @@ export interface RendererDeps {
 
 export interface DrawArgs {
   elapsedSeconds: number;
+  lightPosition: Vec3;
+  pyramids: d.Infer<typeof Pyramid>[];
+  spheres: d.Infer<typeof Sphere>[];
+  boxes: d.Infer<typeof Box>[];
 }
 
 export class Renderer {
@@ -92,11 +93,6 @@ export class Renderer {
     this.pyramidCount = 0;
     this.sphereCount = 1;
     this.boxCount = 1;
-
-    // upload static spheres once; per-frame box upload happens in draw()
-    this.spheresBuffer.patch([
-      makeSphere(vec3.create(0, 0, 0), 1.0, vec3.create(0.2, 0.2, 0.6)),
-    ]);
   }
 
   public static async init(): Promise<Renderer> {
@@ -214,7 +210,7 @@ export class Renderer {
     return renderer;
   }
 
-  public draw({ elapsedSeconds }: DrawArgs) {
+  public draw({ lightPosition, pyramids, spheres, boxes }: DrawArgs) {
     const width = this.canvas.width;
     const height = this.canvas.height;
     const aspect = width / Math.max(1, height);
@@ -225,42 +221,25 @@ export class Renderer {
     const viewProj = mat4.multiply(proj, view);
     mat4.invert(viewProj, this.invViewProj);
 
-    const slowElapsed = elapsedSeconds * 0.1;
-
-    const sunRotation = mat4.rotationY(TAU * frac(slowElapsed * 0.25));
-    const sunPos = vec3.transformMat4(SUN_START, sunRotation);
-
     this.paramsBuffer.write({
       camera: {
         inverseViewProj: mat4x4fFromArray(this.invViewProj),
         position: d.vec3f(eye[0], eye[1], eye[2]),
       },
-      lightPosition: d.vec3f(sunPos[0], sunPos[1], sunPos[2]),
-
-      pyramidCount: this.pyramidCount,
-      sphereCount: this.sphereCount,
-      boxCount: this.boxCount,
-
+      lightPosition: d.vec3f(
+        lightPosition[0],
+        lightPosition[1],
+        lightPosition[2],
+      ),
+      pyramidCount: pyramids.length,
+      sphereCount: spheres.length,
+      boxCount: boxes.length,
       resolution: d.vec2f(width, height),
     });
 
-    // Mirrors examples/ray_marching.rs: localRot * translation * orbitRot,
-    // uploaded uninverted to match the Vulkan reference's visual.
-    const localRot = mat4.rotationZ(TAU * frac(2 * slowElapsed));
-    const translation = mat4.translation(MOON_START);
-    const orbitRot = mat4.rotationY(TAU * frac(slowElapsed));
-    const boxTransform = mat4.multiply(
-      mat4.multiply(localRot, translation),
-      orbitRot,
-    );
-
-    this.boxesBuffer.patch([
-      makeBox(
-        boxTransform,
-        vec3.create(0.2, 0.2, 0.2),
-        vec3.create(0.2, 0.6, 0.2),
-      ),
-    ]);
+    // TODO patch pyramids
+    this.spheresBuffer.patch(spheres);
+    this.boxesBuffer.patch(boxes);
 
     this.pipeline
       .withColorAttachment({
@@ -287,3 +266,23 @@ function createSdfPipeline(
     targets: { format: presentationFormat },
   });
 }
+
+export const mat4x4fFromArray = (arr: ArrayLike<number>) =>
+  d.mat4x4f(
+    arr[0],
+    arr[1],
+    arr[2],
+    arr[3],
+    arr[4],
+    arr[5],
+    arr[6],
+    arr[7],
+    arr[8],
+    arr[9],
+    arr[10],
+    arr[11],
+    arr[12],
+    arr[13],
+    arr[14],
+    arr[15],
+  );
