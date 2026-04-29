@@ -1,68 +1,21 @@
 import "./style.css";
 
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
-import { mat4, vec3 } from "wgpu-matrix";
-import tgpu, {
-  type TgpuRoot,
-  type TgpuRenderPipeline,
-  type TgpuBuffer,
-  type TgpuBindGroup,
-  type UniformFlag,
-  type StorageFlag,
-} from "typegpu";
-import * as d from "typegpu/data";
 
-import {
-  clearRecoverableError,
-  quitIfWebGPUNotAvailableOrMissingFeatures,
-  showRecoverableError,
-} from "./util";
-
-import { Camera } from "./camera";
-import { makeSphere, makeBox, mat4x4fFromArray } from "./scene";
-import {
-  RayMarchingParams,
-  SpheresArray,
-  BoxesArray,
-  sdfLayout,
-} from "./shaders/schemas";
-import { mainVertex } from "./shaders/vertex";
-import { mainFragment } from "./shaders/fragment";
+import { Renderer } from "./renderer";
 
 const MILLIS_PER_FRAME = 16.6;
 const SOUND_EFFECT_COOLDOWN_MS = 500;
 
-const TAU = Math.PI * 2;
-const MOON_START = vec3.create(1, 0, 1);
-const SUN_START = vec3.create(4, 5, 2);
-const frac = (x: number): number => x - Math.floor(x);
-
-type SdfPipeline = TgpuRenderPipeline<d.Vec4f>;
-type ParamsBuffer = TgpuBuffer<typeof RayMarchingParams> & UniformFlag;
-type SpheresBuffer = TgpuBuffer<typeof SpheresArray> & StorageFlag;
-type BoxesBuffer = TgpuBuffer<typeof BoxesArray> & StorageFlag;
-type SdfBindGroup = TgpuBindGroup<{
-  params: { uniform: typeof RayMarchingParams };
-  spheres: { storage: typeof SpheresArray; access: "readonly" };
-  boxes: { storage: typeof BoxesArray; access: "readonly" };
-}>;
-
+/** initial dependencies to construct a GameState */
 interface GameStateDeps {
-  lastTimeMillis: number;
   startTimeMillis: number;
-
+  lastTimeMillis: number;
   audioCtx: AudioContext;
-
-  root: TgpuRoot;
-  context: GPUCanvasContext;
-  canvas: HTMLCanvasElement;
-  pipeline: SdfPipeline;
-  bindGroup: SdfBindGroup;
-  paramsBuffer: ParamsBuffer;
-  spheresBuffer: SpheresBuffer;
-  boxesBuffer: BoxesBuffer;
+  renderer: Renderer;
 }
 
+/** global state passed in to each update */
 interface FrameInput {
   /** millis since program start, aka `performance.now()` */
   now: number;
@@ -71,58 +24,24 @@ interface FrameInput {
 }
 
 class GameState {
-  // fixed timestep tracking
-  lastTimeMillis: number;
-  frameTimeMillis: number;
+  /** the initial value of performance.now() at app start */
   startTimeMillis: number;
+  /** the value of performance.now() at the top of the previous frame */
+  lastTimeMillis: number;
+  /** the accumulator of 'unspent' time for the fixed timestep */
+  frameTimeMillis: number;
 
-  // camera
-  camera: Camera;
-
-  // audio (kept around even though A/B currently no longer trigger sounds)
+  // IO
   audioCtx: AudioContext;
-
-  // rendering
-  root: TgpuRoot;
-  context: GPUCanvasContext;
-  canvas: HTMLCanvasElement;
-  pipeline: SdfPipeline;
-  bindGroup: SdfBindGroup;
-  paramsBuffer: ParamsBuffer;
-  spheresBuffer: SpheresBuffer;
-  boxesBuffer: BoxesBuffer;
-
-  // CPU-side scene state
-  invViewProj: Float32Array;
-  sphereCount: number;
-  boxCount: number;
+  renderer: Renderer;
 
   constructor(deps: GameStateDeps) {
-    this.lastTimeMillis = deps.lastTimeMillis;
     this.startTimeMillis = deps.startTimeMillis;
+    this.lastTimeMillis = deps.lastTimeMillis;
     this.frameTimeMillis = 0.0;
 
-    this.camera = new Camera();
-
     this.audioCtx = deps.audioCtx;
-
-    this.root = deps.root;
-    this.context = deps.context;
-    this.canvas = deps.canvas;
-    this.pipeline = deps.pipeline;
-    this.bindGroup = deps.bindGroup;
-    this.paramsBuffer = deps.paramsBuffer;
-    this.spheresBuffer = deps.spheresBuffer;
-    this.boxesBuffer = deps.boxesBuffer;
-
-    this.invViewProj = new Float32Array(16);
-    this.sphereCount = 1;
-    this.boxCount = 1;
-
-    // upload static spheres once; per-frame box upload happens in draw()
-    this.spheresBuffer.patch({
-      0: makeSphere(vec3.create(0, 0, 0), 1.0, vec3.create(0.2, 0.2, 0.6)),
-    });
+    this.renderer = deps.renderer;
   }
 
   update(input: FrameInput): void {
@@ -133,7 +52,8 @@ class GameState {
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
-      this.camera.applyInput({
+      // TODO move into renderer method, making camera private?
+      this.renderer.camera.applyInput({
         pitchUp: input.playerOne.DPAD.up,
         pitchDown: input.playerOne.DPAD.down,
         yawLeft: input.playerOne.DPAD.left,
@@ -159,60 +79,8 @@ class GameState {
   }
 
   draw(now: number): void {
-    const elapsed = (now - this.startTimeMillis) / 1000;
-
-    const width = this.canvas.width;
-    const height = this.canvas.height;
-    const aspect = width / Math.max(1, height);
-
-    const eye = this.camera.position();
-    const view = mat4.lookAt(eye, this.camera.target, vec3.create(0, 1, 0));
-    const proj = mat4.perspective(Math.PI / 4, aspect, 0.1, 1000);
-    const viewProj = mat4.multiply(proj, view);
-    mat4.invert(viewProj, this.invViewProj);
-
-    const slowElapsed = elapsed * 0.1;
-
-    const sunRotation = mat4.rotationY(TAU * frac(slowElapsed * 0.25));
-    const sunPos = vec3.transformMat4(SUN_START, sunRotation);
-
-    this.paramsBuffer.write({
-      camera: {
-        inverseViewProj: mat4x4fFromArray(this.invViewProj),
-        position: d.vec3f(eye[0], eye[1], eye[2]),
-      },
-      lightPosition: d.vec3f(sunPos[0], sunPos[1], sunPos[2]),
-      sphereCount: this.sphereCount,
-      boxCount: this.boxCount,
-      resolution: d.vec2f(width, height),
-    });
-
-    // Mirrors examples/ray_marching.rs: localRot * translation * orbitRot,
-    // uploaded uninverted to match the Vulkan reference's visual.
-    const localRot = mat4.rotationZ(TAU * frac(2 * slowElapsed));
-    const translation = mat4.translation(MOON_START);
-    const orbitRot = mat4.rotationY(TAU * frac(slowElapsed));
-    const boxTransform = mat4.multiply(
-      mat4.multiply(localRot, translation),
-      orbitRot,
-    );
-    this.boxesBuffer.patch({
-      0: makeBox(
-        boxTransform,
-        vec3.create(0.2, 0.2, 0.2),
-        vec3.create(0.2, 0.6, 0.2),
-      ),
-    });
-
-    this.pipeline
-      .withColorAttachment({
-        view: this.context.getCurrentTexture().createView(),
-        clearValue: [0, 0, 0, 1],
-        loadOp: "clear",
-        storeOp: "store",
-      })
-      .with(this.bindGroup)
-      .draw(3);
+    const elapsedSeconds = (now - this.startTimeMillis) / 1000;
+    this.renderer.draw({ elapsedSeconds });
   }
 }
 
@@ -227,149 +95,26 @@ class SoundEffect {
   }
 }
 
-function createSdfPipeline(
-  root: TgpuRoot,
-  presentationFormat: GPUTextureFormat,
-  vertex: typeof mainVertex,
-  fragment: typeof mainFragment,
-): SdfPipeline {
-  return root.createRenderPipeline({
-    vertex,
-    fragment,
-    primitive: { topology: "triangle-list" },
-    targets: { format: presentationFormat },
-  });
-}
-
 async function init() {
-  const canvas = document.querySelector("canvas") as HTMLCanvasElement;
-  const adapter = await navigator.gpu?.requestAdapter({
-    featureLevel: "compatibility",
-  });
-
-  const device = (await adapter?.requestDevice()) || null;
-  quitIfWebGPUNotAvailableOrMissingFeatures(adapter, device);
-
-  const context = canvas.getContext("webgpu");
-  if (!context) throw new Error("no webgpu context available");
-
-  const sizeCanvas = () => {
-    const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
-    const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-  };
-  sizeCanvas();
-
-  const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
-  context.configure({
-    device,
-    format: presentationFormat,
-  });
-
-  const root = tgpu.initFromDevice({ device });
-
-  const paramsBuffer = root.createBuffer(RayMarchingParams).$usage("uniform");
-  const spheresBuffer = root.createBuffer(SpheresArray).$usage("storage");
-  const boxesBuffer = root.createBuffer(BoxesArray).$usage("storage");
-
-  const bindGroup = root.createBindGroup(sdfLayout, {
-    params: paramsBuffer,
-    spheres: spheresBuffer,
-    boxes: boxesBuffer,
-  });
-
-  let pipeline: SdfPipeline;
-  try {
-    pipeline = createSdfPipeline(
-      root,
-      presentationFormat,
-      mainVertex,
-      mainFragment,
-    );
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    showRecoverableError(msg);
-    throw e;
-  }
-
   const audioCtx = new AudioContext();
+  const renderer = await Renderer.init();
 
   const startTimeMillis = performance.now();
   const game = new GameState({
-    lastTimeMillis: startTimeMillis,
     startTimeMillis,
-
+    lastTimeMillis: startTimeMillis,
     audioCtx,
-
-    root,
-    context,
-    canvas,
-    pipeline,
-    bindGroup,
-    paramsBuffer,
-    spheresBuffer,
-    boxesBuffer,
+    renderer,
   });
-
-  const ro = new ResizeObserver(sizeCanvas);
-  ro.observe(canvas);
 
   const frame = () => {
     const now = performance.now();
-    game.update({
-      now,
-      playerOne: PLAYER_1,
-    });
-
+    game.update({ now, playerOne: PLAYER_1 });
     game.draw(now);
-
     requestAnimationFrame(frame);
   };
 
   requestAnimationFrame(frame);
-
-  if (import.meta.hot) {
-    let currentVertex = mainVertex;
-    let currentFragment = mainFragment;
-
-    const rebuildPipeline = () => {
-      try {
-        game.pipeline = createSdfPipeline(
-          root,
-          presentationFormat,
-          currentVertex,
-          currentFragment,
-        );
-        clearRecoverableError();
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(msg);
-        showRecoverableError(msg);
-      }
-    };
-
-    import.meta.hot.accept("./shaders/vertex.ts", (mod) => {
-      if (mod) {
-        currentVertex = mod.mainVertex;
-      }
-      rebuildPipeline();
-    });
-
-    import.meta.hot.accept("./shaders/fragment.ts", (mod) => {
-      if (mod) {
-        currentFragment = mod.mainFragment;
-      }
-      rebuildPipeline();
-    });
-
-    import.meta.hot.accept("./shaders/schemas.ts", () => {
-      import.meta.hot!.invalidate();
-    });
-  }
 }
 
 init();

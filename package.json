@@ -9,8 +9,8 @@
     "build": "vite build",
     "format": "prettier --write .",
     "download-audio": "bash scripts/download-audio.sh",
-    "check": "tsc --build --noEmit",
-    "check:watch": "tsc --build --noEmit --watch"
+    "typecheck": "tsc --build --noEmit",
+    "typecheck:watch": "tsc --build --noEmit --watch"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.69",
