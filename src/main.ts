@@ -2,7 +2,7 @@ import "./style.css";
 
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
 
-import { Renderer, mat4x4fFromArray, type DrawArgs } from "./renderer";
+import { Renderer, mat4x4fFromArray } from "./renderer";
 import * as audio from "./audio";
 import { mat4, vec3, type Mat4, type Vec3 } from "wgpu-matrix";
 import { d } from "typegpu";
@@ -125,35 +125,31 @@ class GameState {
   }
 
   draw(now: number): void {
-    const pyramids: DrawArgs["pyramids"] = [
-      {
-        transform: mat4x4fFromArray(this.pyramidTransform),
-        height: 0.8,
-        scale: 0.5,
-        color: d.vec3f(0.6, 0.2, 0.2),
-      },
-    ];
-    const spheres: DrawArgs["spheres"] = [
-      {
-        center: d.vec3f(0.0, 0.0, 0.0),
-        radius: 1.0,
-        color: d.vec3f(0.2, 0.2, 0.6),
-      },
-    ];
-    const boxes: DrawArgs["boxes"] = [
-      {
-        transform: mat4x4fFromArray(this.boxTransform),
-        radii: d.vec3f(0.2, 0.2, 0.2),
-        color: d.vec3f(0.2, 0.6, 0.2),
-      },
-    ];
-
     this.renderer.draw({
       elapsedSeconds: this.elapsedSeconds(now),
       lightPosition: this.sunPos,
-      pyramids,
-      spheres,
-      boxes,
+      pyramids: [
+        {
+          transform: mat4x4fFromArray(this.pyramidTransform),
+          height: 0.4,
+          radii: d.vec2f(0.15, 0.1),
+          color: d.vec3f(0.6, 0.2, 0.2),
+        },
+      ],
+      spheres: [
+        {
+          center: d.vec3f(0.0, 0.0, 0.0),
+          radius: 1.0,
+          color: d.vec3f(0.2, 0.2, 0.6),
+        },
+      ],
+      boxes: [
+        {
+          transform: mat4x4fFromArray(this.boxTransform),
+          radii: d.vec3f(0.2, 0.2, 0.2),
+          color: d.vec3f(0.2, 0.6, 0.2),
+        },
+      ],
     });
   }
 }

@@ -35,35 +35,90 @@ const boxSdf = (p: d.v3f, b: d.Infer<typeof Box>): number => {
   );
 };
 
-// https://www.shadertoy.com/view/Ws3SDl
-// this looks different from the original glsl,
-// because wgsl uses immutable params, and doesn't support writing to swizzles
+// https://iquilezles.org/articles/distfunctions/ (udTriangle)
+const triangleSdf = (p: d.v3f, a: d.v3f, b: d.v3f, c: d.v3f): number => {
+  "use gpu";
+
+  const ba = b.sub(a);
+  const cb = c.sub(b);
+  const ac = a.sub(c);
+  const pa = p.sub(a);
+  const pb = p.sub(b);
+  const pc = p.sub(c);
+  const nor = std.cross(ba, ac);
+
+  const outside =
+    std.sign(std.dot(std.cross(ba, nor), pa)) +
+      std.sign(std.dot(std.cross(cb, nor), pb)) +
+      std.sign(std.dot(std.cross(ac, nor), pc)) <
+    2.0;
+
+  let d2 = d.f32(0);
+  if (outside) {
+    const ea = ba
+      .mul(std.clamp(std.dot(ba, pa) / std.dot(ba, ba), 0.0, 1.0))
+      .sub(pa);
+    const eb = cb
+      .mul(std.clamp(std.dot(cb, pb) / std.dot(cb, cb), 0.0, 1.0))
+      .sub(pb);
+    const ec = ac
+      .mul(std.clamp(std.dot(ac, pc) / std.dot(ac, ac), 0.0, 1.0))
+      .sub(pc);
+    d2 = std.min(
+      std.min(std.dot(ea, ea), std.dot(eb, eb)),
+      std.dot(ec, ec),
+    );
+  } else {
+    const dn = std.dot(nor, pa);
+    d2 = (dn * dn) / std.dot(nor, nor);
+  }
+  return std.sqrt(d2);
+};
+
+// Rectangular pyramid SDF. The closed pyramid is the convex intersection of
+// 4 slanted half-spaces and the base half-space, so inside it the signed
+// distance equals the largest plane-distance (negative). Outside, we fall
+// back to the true distance to one of the face triangles or the base.
 const pyramidSdf = (p: d.v3f, pyramid: d.Infer<typeof Pyramid>): number => {
   "use gpu";
 
-  const local = pyramid.transform.mul(d.vec4f(p, 1)).xyz.div(pyramid.scale);
+  const local = pyramid.transform.mul(d.vec4f(p, 1)).xyz;
   const h = pyramid.height;
-  const m2 = h * h + d.f32(0.25);
+  const rx = pyramid.radii.x;
+  const rz = pyramid.radii.y;
 
-  let pp = d.vec3f(std.abs(local.x), local.y, std.abs(local.z));
-  if (pp.z > pp.x) {
-    pp = d.vec3f(pp.z, pp.y, pp.x);
+  const folded = d.vec3f(std.abs(local.x), local.y, std.abs(local.z));
+
+  const dxPlane =
+    (h * (folded.x - rx) + rx * folded.y) / std.sqrt(h * h + rx * rx);
+  const dzPlane =
+    (h * (folded.z - rz) + rz * folded.y) / std.sqrt(h * h + rz * rz);
+  const dyPlane = -folded.y;
+  const maxPlane = std.max(std.max(dxPlane, dzPlane), dyPlane);
+
+  let result = maxPlane;
+  if (maxPlane > 0.0) {
+    const apex = d.vec3f(0, h, 0);
+    const dxTri = triangleSdf(
+      folded,
+      d.vec3f(rx, 0, -rz),
+      d.vec3f(rx, 0, rz),
+      apex,
+    );
+    const dzTri = triangleSdf(
+      folded,
+      d.vec3f(-rx, 0, rz),
+      d.vec3f(rx, 0, rz),
+      apex,
+    );
+    const dxBase = std.max(folded.x - rx, 0.0);
+    const dzBase = std.max(folded.z - rz, 0.0);
+    const baseDist = std.sqrt(
+      dxBase * dxBase + dzBase * dzBase + folded.y * folded.y,
+    );
+    result = std.min(std.min(dxTri, dzTri), baseDist);
   }
-  pp = d.vec3f(pp.x - 0.5, pp.y, pp.z - 0.5);
-
-  const q = d.vec3f(pp.z, h * pp.y - 0.5 * pp.x, h * pp.x + 0.5 * pp.y);
-  const s = std.max(-q.x, 0.0);
-  const t = std.clamp((q.y - 0.5 * pp.z) / (m2 + 0.25), 0.0, 1.0);
-  const a = m2 * (q.x + s) * (q.x + s) + q.y * q.y;
-  const b =
-    m2 * (q.x + 0.5 * t) * (q.x + 0.5 * t) + (q.y - m2 * t) * (q.y - m2 * t);
-
-  let d2 = d.f32(0.0);
-  if (std.min(q.y, -q.x * m2 - q.y * 0.5) <= 0.0) {
-    d2 = std.min(a, b);
-  }
-  const slanted = std.sqrt((d2 + q.z * q.z) / m2) * std.sign(q.z);
-  return std.max(slanted, -local.y) * pyramid.scale;
+  return result;
 };
 
 const closestShape = (p: d.v3f): d.Infer<typeof RayHit> => {
