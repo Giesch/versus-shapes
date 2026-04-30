@@ -34,6 +34,7 @@ export const Box = d.struct({
 export const Pyramid = d.struct({
   transform: d.mat4x4f,
   height: d.f32,
+  scale: d.f32,
   color: d.vec3f,
 });
 

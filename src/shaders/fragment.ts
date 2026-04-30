@@ -2,7 +2,7 @@ import tgpu from "typegpu";
 import * as d from "typegpu/data";
 import * as std from "typegpu/std";
 
-import { sdfLayout, Sphere, Box } from "./schemas";
+import { sdfLayout, Sphere, Box, Pyramid } from "./schemas";
 
 const MAX_STEPS = 64;
 const MAX_DISTANCE = d.f32(1000);
@@ -38,13 +38,15 @@ const boxSdf = (p: d.v3f, b: d.Infer<typeof Box>): number => {
 // https://www.shadertoy.com/view/Ws3SDl
 // this looks different from the original glsl,
 // because wgsl uses immutable params, and doesn't support writing to swizzles
-const pyramidSdf = (p: d.v3f, h: number) => {
+const pyramidSdf = (p: d.v3f, pyramid: d.Infer<typeof Pyramid>): number => {
   "use gpu";
 
+  const local = pyramid.transform.mul(d.vec4f(p, 1)).xyz.div(pyramid.scale);
+  const h = pyramid.height;
   const m2 = h * h + d.f32(0.25);
 
-  let pp = d.vec3f(std.abs(p.x), p.y, std.abs(p.z));
-  if (p.z > p.x) {
+  let pp = d.vec3f(std.abs(local.x), local.y, std.abs(local.z));
+  if (pp.z > pp.x) {
     pp = d.vec3f(pp.z, pp.y, pp.x);
   }
   pp = d.vec3f(pp.x - 0.5, pp.y, pp.z - 0.5);
@@ -60,7 +62,8 @@ const pyramidSdf = (p: d.v3f, h: number) => {
   if (std.min(q.y, -q.x * m2 - q.y * 0.5) <= 0.0) {
     d2 = std.min(a, b);
   }
-  return std.sqrt((d2 + q.z * q.z) / m2) * std.sign(std.max(q.z, -p.y));
+  const slanted = std.sqrt((d2 + q.z * q.z) / m2) * std.sign(q.z);
+  return std.max(slanted, -local.y) * pyramid.scale;
 };
 
 const closestShape = (p: d.v3f): d.Infer<typeof RayHit> => {
@@ -70,7 +73,7 @@ const closestShape = (p: d.v3f): d.Infer<typeof RayHit> => {
 
   for (let i = d.u32(0); i < sdfLayout.$.params.pyramidCount; i++) {
     const pyramid = sdfLayout.$.pyramids[i];
-    const dist = pyramidSdf(p, pyramid.height);
+    const dist = pyramidSdf(p, pyramid);
     if (dist < hit.distance) {
       hit = RayHit({ distance: dist, color: pyramid.color });
     }

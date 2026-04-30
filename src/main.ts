@@ -50,6 +50,7 @@ class GameState {
 
   sunPos: Vec3;
   boxTransform: Mat4;
+  pyramidTransform: Mat4;
 
   constructor(deps: GameStateDeps) {
     this.startTimeMillis = deps.startTimeMillis;
@@ -62,6 +63,7 @@ class GameState {
 
     this.sunPos = vec3.clone(SUN_START);
     this.boxTransform = mat4.identity();
+    this.pyramidTransform = mat4.identity();
   }
 
   update(input: FrameInput): void {
@@ -72,7 +74,7 @@ class GameState {
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
-      this.renderer.camera.applyInput({
+      this.renderer.camera.update({
         pitchUp: input.playerOne.DPAD.up,
         pitchDown: input.playerOne.DPAD.down,
         yawLeft: input.playerOne.DPAD.left,
@@ -81,23 +83,38 @@ class GameState {
         zoomOut: input.playerOne.B,
       });
 
-      const elapsedSeconds = (input.now - this.startTimeMillis) / 1000;
-      const slowElapsed = elapsedSeconds * 0.1;
+      const slowElapsed = this.elapsedSeconds(input.now) * 0.1;
 
       // update sun orbit
       const sunRotation = mat4.rotationY(TAU * frac(slowElapsed * 0.25));
       vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
 
-      // update cube orbit
+      // shared orbits
       const localRot = mat4.rotationZ(TAU * frac(2 * slowElapsed));
       const translation = mat4.translation(MOON_START);
-      const orbitRot = mat4.rotationY(TAU * frac(slowElapsed));
+
+      // update cube orbit
+      const cubeOrbitRotation = mat4.rotationY(TAU * frac(slowElapsed));
       mat4.multiply(
         mat4.multiply(localRot, translation),
-        orbitRot,
+        cubeOrbitRotation,
         this.boxTransform,
       );
+
+      // update pyramid orbit
+      const pyramidOrbitRotation = mat4.rotationY(
+        TAU * frac(slowElapsed) - 1.0,
+      );
+      mat4.multiply(
+        mat4.multiply(localRot, translation),
+        pyramidOrbitRotation,
+        this.pyramidTransform,
+      );
     }
+  }
+
+  elapsedSeconds(nowMillis: number): number {
+    return (nowMillis - this.startTimeMillis) / 1000;
   }
 
   playAudio(buffer: AudioBuffer): void {
@@ -108,10 +125,14 @@ class GameState {
   }
 
   draw(now: number): void {
-    // TODO  share with update?
-    const elapsedSeconds = (now - this.startTimeMillis) / 1000;
-
-    const pyramids: DrawArgs["pyramids"] = [];
+    const pyramids: DrawArgs["pyramids"] = [
+      {
+        transform: mat4x4fFromArray(this.pyramidTransform),
+        height: 0.8,
+        scale: 0.5,
+        color: d.vec3f(0.6, 0.2, 0.2),
+      },
+    ];
     const spheres: DrawArgs["spheres"] = [
       {
         center: d.vec3f(0.0, 0.0, 0.0),
@@ -119,7 +140,7 @@ class GameState {
         color: d.vec3f(0.2, 0.2, 0.6),
       },
     ];
-    const boxes = [
+    const boxes: DrawArgs["boxes"] = [
       {
         transform: mat4x4fFromArray(this.boxTransform),
         radii: d.vec3f(0.2, 0.2, 0.2),
@@ -128,7 +149,7 @@ class GameState {
     ];
 
     this.renderer.draw({
-      elapsedSeconds,
+      elapsedSeconds: this.elapsedSeconds(now),
       lightPosition: this.sunPos,
       pyramids,
       spheres,

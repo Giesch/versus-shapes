@@ -31,8 +31,11 @@ import { mainFragment } from "./shaders/fragment";
 
 type SdfPipeline = TgpuRenderPipeline<d.Vec4f>;
 type ParamsBuffer = TgpuBuffer<typeof RayMarchingParams> & UniformFlag;
+
+type PyramidsBuffer = TgpuBuffer<typeof PyramidsArray> & StorageFlag;
 type SpheresBuffer = TgpuBuffer<typeof SpheresArray> & StorageFlag;
 type BoxesBuffer = TgpuBuffer<typeof BoxesArray> & StorageFlag;
+
 type SdfBindGroup = TgpuBindGroup<{
   params: { uniform: typeof RayMarchingParams };
   spheres: { storage: typeof SpheresArray; access: "readonly" };
@@ -46,6 +49,7 @@ export interface RendererDeps {
   pipeline: SdfPipeline;
   bindGroup: SdfBindGroup;
   paramsBuffer: ParamsBuffer;
+  pyramidsBuffer: PyramidsBuffer;
   spheresBuffer: SpheresBuffer;
   boxesBuffer: BoxesBuffer;
 }
@@ -68,6 +72,7 @@ export class Renderer {
   pipeline: SdfPipeline;
   bindGroup: SdfBindGroup;
   paramsBuffer: ParamsBuffer;
+  pyramidsBuffer: PyramidsBuffer;
   spheresBuffer: SpheresBuffer;
   boxesBuffer: BoxesBuffer;
 
@@ -86,6 +91,7 @@ export class Renderer {
     this.pipeline = deps.pipeline;
     this.bindGroup = deps.bindGroup;
     this.paramsBuffer = deps.paramsBuffer;
+    this.pyramidsBuffer = deps.pyramidsBuffer;
     this.spheresBuffer = deps.spheresBuffer;
     this.boxesBuffer = deps.boxesBuffer;
 
@@ -159,6 +165,7 @@ export class Renderer {
       pipeline,
       bindGroup,
       paramsBuffer,
+      pyramidsBuffer,
       spheresBuffer,
       boxesBuffer,
     });
@@ -237,7 +244,7 @@ export class Renderer {
       resolution: d.vec2f(width, height),
     });
 
-    // TODO patch pyramids
+    this.pyramidsBuffer.patch(pyramids);
     this.spheresBuffer.patch(spheres);
     this.boxesBuffer.patch(boxes);
 

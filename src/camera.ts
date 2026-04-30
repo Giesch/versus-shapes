@@ -49,7 +49,7 @@ export class Camera {
     out[2] = z;
   }
 
-  applyInput(input: CameraControls): void {
+  update(input: CameraControls): void {
     if (input.yawLeft) this.yaw -= YAW_SPEED;
     if (input.yawRight) this.yaw += YAW_SPEED;
 
