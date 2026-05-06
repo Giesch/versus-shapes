@@ -2,7 +2,7 @@ import "./style.css";
 
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
 
-import { Renderer, mat4x4fFromArray } from "./renderer";
+import { Renderer, mat4x4fFromArray, type DrawArgs } from "./renderer";
 import * as audio from "./audio";
 import { mat4, vec3, type Mat4, type Vec3 } from "wgpu-matrix";
 import { d } from "typegpu";
@@ -10,7 +10,7 @@ import { d } from "typegpu";
 const MILLIS_PER_FRAME = 16.6;
 
 const TAU = Math.PI * 2;
-const MOON_START = vec3.create(1, 0, 1);
+const PYRAMID_START = vec3.create(1.25, 0, 0);
 const SUN_START = vec3.create(4, 5, 2);
 const frac = (x: number): number => x - Math.floor(x);
 
@@ -49,8 +49,9 @@ class GameState {
   assets: Assets;
 
   sunPos: Vec3;
-  boxTransform: Mat4;
   pyramidTransform: Mat4;
+
+  pyramids: DrawArgs["pyramids"];
 
   constructor(deps: GameStateDeps) {
     this.startTimeMillis = deps.startTimeMillis;
@@ -62,8 +63,8 @@ class GameState {
     this.assets = deps.assets;
 
     this.sunPos = vec3.clone(SUN_START);
-    this.boxTransform = mat4.identity();
     this.pyramidTransform = mat4.identity();
+    this.pyramids = [this.drawPyramid(this.pyramidTransform)];
   }
 
   update(input: FrameInput): void {
@@ -74,42 +75,26 @@ class GameState {
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
-      this.renderer.camera.update({
-        pitchUp: input.playerOne.DPAD.up,
-        pitchDown: input.playerOne.DPAD.down,
-        yawLeft: input.playerOne.DPAD.left,
-        yawRight: input.playerOne.DPAD.right,
-        zoomIn: input.playerOne.A,
-        zoomOut: input.playerOne.B,
-      });
-
       const slowElapsed = this.elapsedSeconds(input.now) * 0.1;
 
       // update sun orbit
-      const sunRotation = mat4.rotationY(TAU * frac(slowElapsed * 0.25));
+      const sunRotation = mat4.rotationY(TAU);
       vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
 
-      // shared orbits
-      const localRot = mat4.rotationZ(TAU * frac(2 * slowElapsed));
-      const translation = mat4.translation(MOON_START);
-
-      // update cube orbit
-      const cubeOrbitRotation = mat4.rotationY(TAU * frac(slowElapsed));
-      mat4.multiply(
-        mat4.multiply(localRot, translation),
-        cubeOrbitRotation,
-        this.boxTransform,
-      );
-
-      // update pyramid orbit
-      const pyramidOrbitRotation = mat4.rotationY(
+      // update pyramid orbit & rotation
+      const pyramidStart = mat4.translation(PYRAMID_START);
+      const pyramidUp = mat4.rotationZ(-Math.PI / 2);
+      const pyramidLocalRoll = mat4.rotationX(TAU * frac(2 * slowElapsed));
+      const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
+      const pyramidOrbitRotation = mat4.rotationZ(
         TAU * frac(slowElapsed) - 1.0,
       );
       mat4.multiply(
-        mat4.multiply(localRot, translation),
+        mat4.multiply(pyramidLocalRotation, pyramidStart),
         pyramidOrbitRotation,
         this.pyramidTransform,
       );
+      this.pyramids[0] = this.drawPyramid(this.pyramidTransform);
     }
   }
 
@@ -128,14 +113,8 @@ class GameState {
     this.renderer.draw({
       elapsedSeconds: this.elapsedSeconds(now),
       lightPosition: this.sunPos,
-      pyramids: [
-        {
-          transform: mat4x4fFromArray(this.pyramidTransform),
-          height: 0.4,
-          radii: d.vec2f(0.15, 0.1),
-          color: d.vec3f(0.6, 0.2, 0.2),
-        },
-      ],
+      pyramids: this.pyramids,
+      // TODO also instance var?
       spheres: [
         {
           center: d.vec3f(0.0, 0.0, 0.0),
@@ -143,14 +122,17 @@ class GameState {
           color: d.vec3f(0.2, 0.2, 0.6),
         },
       ],
-      boxes: [
-        {
-          transform: mat4x4fFromArray(this.boxTransform),
-          radii: d.vec3f(0.2, 0.2, 0.2),
-          color: d.vec3f(0.2, 0.6, 0.2),
-        },
-      ],
+      boxes: [],
     });
+  }
+
+  drawPyramid(pyramidTransform: Mat4) {
+    return {
+      transform: mat4x4fFromArray(pyramidTransform),
+      height: 0.4,
+      radii: d.vec2f(0.15, 0.1),
+      color: d.vec3f(0.6, 0.2, 0.2),
+    };
   }
 }
 
