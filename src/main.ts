@@ -53,16 +53,21 @@ class GameState {
 
   pyramids: DrawArgs["pyramids"];
 
+  currentRotationTurns: number;
+
   constructor(deps: GameStateDeps) {
     this.startTimeMillis = deps.startTimeMillis;
     this.lastTimeMillis = deps.lastTimeMillis;
     this.frameTimeMillis = 0.0;
+    // NOTE 0.0 == 1.0 == pointing left
+    this.currentRotationTurns = 0.25;
 
     this.audioCtx = deps.audioCtx;
     this.renderer = deps.renderer;
     this.assets = deps.assets;
 
     this.sunPos = vec3.clone(SUN_START);
+    // TODO does this do anything any more?
     this.pyramidTransform = mat4.identity();
     this.pyramids = [this.drawPyramid(this.pyramidTransform)];
   }
@@ -76,6 +81,17 @@ class GameState {
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
       const slowElapsed = this.elapsedSeconds(input.now) * 0.1;
+      const pyramidRollFrac = frac(2 * slowElapsed);
+
+      // read input
+      if (input.playerOne.DPAD.left) {
+        this.currentRotationTurns -= 0.01;
+      }
+      if (input.playerOne.DPAD.right) {
+        this.currentRotationTurns += 0.01;
+      }
+
+      // TODO the rest of this can go back into draw?
 
       // update sun orbit
       const sunRotation = mat4.rotationY(TAU);
@@ -84,10 +100,10 @@ class GameState {
       // update pyramid orbit & rotation
       const pyramidStart = mat4.translation(PYRAMID_START);
       const pyramidUp = mat4.rotationZ(-Math.PI / 2);
-      const pyramidLocalRoll = mat4.rotationX(TAU * frac(2 * slowElapsed));
+      const pyramidLocalRoll = mat4.rotationX(TAU * pyramidRollFrac);
       const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
       const pyramidOrbitRotation = mat4.rotationZ(
-        TAU * frac(slowElapsed) - 1.0,
+        TAU * this.currentRotationTurns,
       );
       mat4.multiply(
         mat4.multiply(pyramidLocalRotation, pyramidStart),
@@ -131,7 +147,7 @@ class GameState {
       transform: mat4x4fFromArray(pyramidTransform),
       height: 0.4,
       radii: d.vec2f(0.15, 0.1),
-      color: d.vec3f(0.6, 0.2, 0.2),
+      color: d.vec3f(0.2, 0.6, 0.2),
     };
   }
 }
