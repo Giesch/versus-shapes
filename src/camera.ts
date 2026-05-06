@@ -31,22 +31,14 @@ export class Camera {
     this.target = vec3.create(0, 0, 0);
   }
 
-  position(): Vec3;
-  position(out: Vec3): void;
-  position(out?: Vec3): Vec3 | void {
+  position(): Vec3 {
     const cosPitch = Math.cos(this.pitch);
 
     const x = this.target[0] + this.distance * Math.sin(this.yaw) * cosPitch;
     const y = this.target[1] + this.distance * Math.sin(this.pitch);
     const z = this.target[2] + this.distance * Math.cos(this.yaw) * cosPitch;
 
-    if (!out) {
-      return vec3.create(x, y, z);
-    }
-
-    out[0] = x;
-    out[1] = y;
-    out[2] = z;
+    return vec3.create(x, y, z);
   }
 
   update(input: CameraControls): void {
@@ -59,6 +51,7 @@ export class Camera {
 
     if (input.zoomIn) this.distance *= ZOOM_FACTOR_PER_STEP;
     if (input.zoomOut) this.distance /= ZOOM_FACTOR_PER_STEP;
+
     this.distance = clamp({
       min: DISTANCE_MIN,
       max: DISTANCE_MAX,
