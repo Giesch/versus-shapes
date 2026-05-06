@@ -82,8 +82,7 @@ class GameState {
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
-      const slowElapsed = this.elapsedSeconds(input.now) * 0.1;
-      this.pyramidRollFrac = frac(2 * slowElapsed);
+      this.pyramidRollFrac = frac(2 * this.elapsedSeconds(input.now) * 0.1);
 
       // read input
       if (input.playerOne.DPAD.left) {
@@ -107,7 +106,7 @@ class GameState {
   }
 
   draw(now: number): void {
-    const sunRotation = mat4.rotationY(TAU);
+    const sunRotation = mat4.rotationY(TAU * this.elapsedSeconds(now) * 0.1);
     vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
 
     // update pyramid orbit & rotation
