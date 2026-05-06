@@ -45,6 +45,7 @@ class GameState {
 
   // IO
   audioCtx: AudioContext;
+  musicGain: GainNode;
   renderer: Renderer;
   assets: Assets;
 
@@ -62,6 +63,10 @@ class GameState {
     this.currentRotationTurns = 0.25;
 
     this.audioCtx = deps.audioCtx;
+    this.musicGain = this.audioCtx.createGain();
+    this.musicGain.gain.value = 1.5;
+    this.musicGain.connect(this.audioCtx.destination);
+
     this.renderer = deps.renderer;
     this.assets = deps.assets;
 
@@ -118,7 +123,7 @@ class GameState {
   playAudio(buffer: AudioBuffer): void {
     let source = this.audioCtx.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.audioCtx.destination);
+    source.connect(this.musicGain);
     source.start();
   }
 
