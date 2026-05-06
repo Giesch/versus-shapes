@@ -8,7 +8,8 @@
     "dev": "concurrently \"vite --port 5173 --strictPort\" \"rcade dev http://localhost:5173\"",
     "build": "vite build",
     "format": "prettier --write .",
-    "download-audio": "bash scripts/download-audio.sh",
+    "download-audio": "./scripts/download-audio.sh",
+    "beats-json": "./scripts/extract_beats.py ./public",
     "typecheck": "tsc --build --noEmit",
     "typecheck:watch": "tsc --build --noEmit --watch"
   },
