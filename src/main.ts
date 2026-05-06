@@ -2,7 +2,7 @@ import "./style.css";
 
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
 
-import { Renderer, mat4x4fFromArray, type DrawArgs } from "./renderer";
+import { Renderer, mat4x4fFromArray } from "./renderer";
 import * as audio from "./audio";
 import { mat4, vec3, type Mat4, type Vec3 } from "wgpu-matrix";
 import { d } from "typegpu";
@@ -51,28 +51,27 @@ class GameState {
 
   sunPos: Vec3;
 
-  pyramids: DrawArgs["pyramids"];
-
+  // NOTE 0.0 == 1.0 == pointing left
   currentRotationTurns: number;
+  pyramidRollFrac: number;
 
   constructor(deps: GameStateDeps) {
     this.startTimeMillis = deps.startTimeMillis;
     this.lastTimeMillis = deps.lastTimeMillis;
     this.frameTimeMillis = 0.0;
-    // NOTE 0.0 == 1.0 == pointing left
+
     this.currentRotationTurns = 0.25;
+    this.pyramidRollFrac = 0.0;
 
     this.audioCtx = deps.audioCtx;
     this.musicGain = this.audioCtx.createGain();
-    this.musicGain.gain.value = 1.5;
+    this.musicGain.gain.value = 1.2;
     this.musicGain.connect(this.audioCtx.destination);
 
     this.renderer = deps.renderer;
     this.assets = deps.assets;
 
     this.sunPos = vec3.clone(SUN_START);
-    // TODO does this do anything any more?
-    this.pyramids = [this.drawPyramid(mat4.identity())];
   }
 
   update(input: FrameInput): void {
@@ -84,7 +83,7 @@ class GameState {
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
       const slowElapsed = this.elapsedSeconds(input.now) * 0.1;
-      const pyramidRollFrac = frac(2 * slowElapsed);
+      this.pyramidRollFrac = frac(2 * slowElapsed);
 
       // read input
       if (input.playerOne.DPAD.left) {
@@ -93,26 +92,6 @@ class GameState {
       if (input.playerOne.DPAD.right) {
         this.currentRotationTurns += 0.01;
       }
-
-      // TODO the rest of this can go back into draw?
-
-      // update sun orbit
-      const sunRotation = mat4.rotationY(TAU);
-      vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
-
-      // update pyramid orbit & rotation
-      const pyramidStart = mat4.translation(PYRAMID_START);
-      const pyramidUp = mat4.rotationZ(-Math.PI / 2);
-      const pyramidLocalRoll = mat4.rotationX(TAU * pyramidRollFrac);
-      const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
-      const pyramidOrbitRotation = mat4.rotationZ(
-        TAU * this.currentRotationTurns,
-      );
-      const pyramidTransform = mat4.multiply(
-        mat4.multiply(pyramidLocalRotation, pyramidStart),
-        pyramidOrbitRotation,
-      );
-      this.pyramids[0] = this.drawPyramid(pyramidTransform);
     }
   }
 
@@ -128,11 +107,33 @@ class GameState {
   }
 
   draw(now: number): void {
+    const sunRotation = mat4.rotationY(TAU);
+    vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
+
+    // update pyramid orbit & rotation
+    const pyramidStart = mat4.translation(PYRAMID_START);
+    const pyramidUp = mat4.rotationZ(-Math.PI / 2);
+    const pyramidLocalRoll = mat4.rotationX(TAU * this.pyramidRollFrac);
+    const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
+    const pyramidOrbitRotation = mat4.rotationZ(
+      TAU * this.currentRotationTurns,
+    );
+    const pyramidTransform = mat4.multiply(
+      mat4.multiply(pyramidLocalRotation, pyramidStart),
+      pyramidOrbitRotation,
+    );
+
     this.renderer.draw({
       elapsedSeconds: this.elapsedSeconds(now),
       lightPosition: this.sunPos,
-      pyramids: this.pyramids,
-      // TODO also instance var?
+      pyramids: [
+        {
+          transform: mat4x4fFromArray(pyramidTransform),
+          height: 0.4,
+          radii: d.vec2f(0.15, 0.1),
+          color: d.vec3f(0.2, 0.6, 0.2),
+        },
+      ],
       spheres: [
         {
           center: d.vec3f(0.0, 0.0, 0.0),
@@ -142,15 +143,6 @@ class GameState {
       ],
       boxes: [],
     });
-  }
-
-  drawPyramid(pyramidTransform: Mat4) {
-    return {
-      transform: mat4x4fFromArray(pyramidTransform),
-      height: 0.4,
-      radii: d.vec2f(0.15, 0.1),
-      color: d.vec3f(0.2, 0.6, 0.2),
-    };
   }
 }
 
