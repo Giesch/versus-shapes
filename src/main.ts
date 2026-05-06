@@ -49,7 +49,6 @@ class GameState {
   assets: Assets;
 
   sunPos: Vec3;
-  pyramidTransform: Mat4;
 
   pyramids: DrawArgs["pyramids"];
 
@@ -68,8 +67,7 @@ class GameState {
 
     this.sunPos = vec3.clone(SUN_START);
     // TODO does this do anything any more?
-    this.pyramidTransform = mat4.identity();
-    this.pyramids = [this.drawPyramid(this.pyramidTransform)];
+    this.pyramids = [this.drawPyramid(mat4.identity())];
   }
 
   update(input: FrameInput): void {
@@ -105,12 +103,11 @@ class GameState {
       const pyramidOrbitRotation = mat4.rotationZ(
         TAU * this.currentRotationTurns,
       );
-      mat4.multiply(
+      const pyramidTransform = mat4.multiply(
         mat4.multiply(pyramidLocalRotation, pyramidStart),
         pyramidOrbitRotation,
-        this.pyramidTransform,
       );
-      this.pyramids[0] = this.drawPyramid(this.pyramidTransform);
+      this.pyramids[0] = this.drawPyramid(pyramidTransform);
     }
   }
 
