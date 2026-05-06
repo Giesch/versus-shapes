@@ -64,10 +64,7 @@ const triangleSdf = (p: d.v3f, a: d.v3f, b: d.v3f, c: d.v3f): number => {
     const ec = ac
       .mul(std.clamp(std.dot(ac, pc) / std.dot(ac, ac), 0.0, 1.0))
       .sub(pc);
-    d2 = std.min(
-      std.min(std.dot(ea, ea), std.dot(eb, eb)),
-      std.dot(ec, ec),
-    );
+    d2 = std.min(std.min(std.dot(ea, ea), std.dot(eb, eb)), std.dot(ec, ec));
   } else {
     const dn = std.dot(nor, pa);
     d2 = (dn * dn) / std.dot(nor, nor);
@@ -190,7 +187,7 @@ const basicLighting = (
   const viewDir = rayDir.mul(-1);
   const lightColor = d.vec3f(1, 1, 1);
 
-  const ambientStrength = 0.005;
+  const ambientStrength = 0.05;
   const ambient = lightColor.mul(ambientStrength);
 
   const diffuse = lightColor.mul(std.max(0, std.dot(normal, lightDir)));
