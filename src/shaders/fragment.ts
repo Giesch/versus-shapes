@@ -187,7 +187,7 @@ const basicLighting = (
   const viewDir = rayDir.mul(-1);
   const lightColor = d.vec3f(1, 1, 1);
 
-  const ambientStrength = 0.05;
+  const ambientStrength = 0.5;
   const ambient = lightColor.mul(ambientStrength);
 
   const diffuse = lightColor.mul(std.max(0, std.dot(normal, lightDir)));
