@@ -12,7 +12,6 @@ import versusShapesJson from "./data/versus-shapes.beats.json";
 const MILLIS_PER_FRAME = 16.6;
 
 const TAU = Math.PI * 2;
-const PYRAMID_START = vec3.create(1.25, 0, 0);
 const SUN_START = vec3.create(4, 5, 2);
 const frac = (x: number): number => x - Math.floor(x);
 
@@ -150,7 +149,9 @@ class GameState {
     vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
 
     // update pyramid orbit & rotation
-    const pyramidStart = mat4.translation(PYRAMID_START);
+    const pyramidStart = mat4.translation(
+      vec3.create(1.15 + 0.1 * this.beatProximity, 0, 0),
+    );
     const pyramidUp = mat4.rotationZ(-Math.PI / 2);
     const pyramidLocalRoll = mat4.rotationX(TAU * this.pyramidRollFrac);
     const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
