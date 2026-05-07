@@ -32,8 +32,10 @@ interface Assets {
 interface FrameInput {
   /** millis since program start, aka `performance.now()` */
   now: number;
-  /** Player 1's inputs */
+  /** Player 1's dpad and button inputs */
   playerOne: typeof PLAYER_1;
+  /** this frame's step delta from the spinner input */
+  spinDelta: number;
 }
 
 class GameState {
@@ -125,15 +127,7 @@ class GameState {
       this.pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
 
       // input
-      if (input.playerOne.DPAD.left) {
-        this.currentRotationTurns -= 0.01;
-      }
-      if (input.playerOne.DPAD.right) {
-        this.currentRotationTurns += 0.01;
-      }
-
-      let spinDelta = spinners.PLAYER_1.SPINNER.consume_step_delta();
-      this.currentRotationTurns += spinDelta * 0.01;
+      this.currentRotationTurns += input.spinDelta * 0.01;
     }
   }
 
@@ -205,7 +199,8 @@ async function init() {
 
   const frame = () => {
     const now = performance.now();
-    game.update({ now, playerOne: PLAYER_1 });
+    let spinDelta = spinners.PLAYER_1.SPINNER.consume_step_delta();
+    game.update({ now, spinDelta, playerOne: PLAYER_1 });
     game.draw(now);
     requestAnimationFrame(frame);
   };
