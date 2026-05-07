@@ -148,7 +148,7 @@ class GameState {
 
     // update pyramid orbit & rotation
     const pyramidStart = mat4.translation(
-      vec3.create(1.15 - 0.25 + 0.1 * this.beatProximity, 0, 0),
+      vec3.create(1.15 - 0.5 + 0.1 * this.beatProximity, 0, 0),
     );
     const pyramidUp = mat4.rotationZ(-Math.PI / 2);
     const pyramidLocalRoll = mat4.rotationX(TAU * this.pyramidRollFrac);
@@ -167,15 +167,15 @@ class GameState {
       pyramids: [
         {
           transform: mat4x4fFromArray(pyramidTransform),
-          height: 0.4 + 0.05 * this.beatProximity,
-          radii: d.vec2f(0.15, 0.1),
+          height: 0.2 + 0.025 * this.beatProximity,
+          radii: d.vec2f(0.075, 0.05),
           color: d.vec3f(0.2, 0.6, 0.2),
         },
       ],
       spheres: [
         {
           center: d.vec3f(0.0, 0.0, 0.0),
-          radius: 0.75,
+          radius: 1 - 0.5,
           color: d.vec3f(0.2, 0.2, 0.6),
         },
       ],
