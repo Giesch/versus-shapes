@@ -4,8 +4,10 @@ import { PLAYER_1 } from "@rcade/plugin-input-classic";
 
 import { Renderer, mat4x4fFromArray } from "./renderer";
 import * as audio from "./audio";
-import { mat4, vec3, type Mat4, type Vec3 } from "wgpu-matrix";
+import { mat4, vec3, type Vec3 } from "wgpu-matrix";
 import { d } from "typegpu";
+
+import versusShapesJson from "./data/versus-shapes.beats.json";
 
 const MILLIS_PER_FRAME = 16.6;
 
@@ -17,7 +19,6 @@ const frac = (x: number): number => x - Math.floor(x);
 /** initial dependencies to construct a GameState */
 interface GameStateDeps {
   startTimeMillis: number;
-  lastTimeMillis: number;
   audioCtx: AudioContext;
   renderer: Renderer;
   assets: Assets;
@@ -55,9 +56,18 @@ class GameState {
   currentRotationTurns: number;
   pyramidRollFrac: number;
 
+  /** the beat timestamps from essentia */
+  beats: number[];
+  /**
+   * the index of the last beat timestamp that we've passed;
+   * we're between this one and the next
+   */
+  beatIndex: number;
+  beatProximity: number;
+
   constructor(deps: GameStateDeps) {
     this.startTimeMillis = deps.startTimeMillis;
-    this.lastTimeMillis = deps.lastTimeMillis;
+    this.lastTimeMillis = deps.startTimeMillis;
     this.frameTimeMillis = 0.0;
 
     this.currentRotationTurns = 0.25;
@@ -72,6 +82,10 @@ class GameState {
     this.assets = deps.assets;
 
     this.sunPos = vec3.clone(SUN_START);
+
+    this.beats = versusShapesJson.beats;
+    this.beatIndex = 0;
+    this.beatProximity = 0;
   }
 
   update(input: FrameInput): void {
@@ -80,11 +94,37 @@ class GameState {
     this.lastTimeMillis = input.now;
 
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
+      // timestep
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
+      const elapsedSeconds = this.elapsedSeconds(input.now);
+
+      // advance beat index
+      let nextBeat = this.beats[this.beatIndex + 1];
+      while (nextBeat < elapsedSeconds) {
+        this.beatIndex++;
+        nextBeat = this.beats[this.beatIndex + 1];
+      }
+
+      // set beat proximity
+      const beatBefore = this.beats[this.beatIndex];
+      const beatAfter = this.beats[this.beatIndex + 1];
+      if (beatAfter) {
+        let beatDuration = beatAfter - beatBefore;
+        let midpoint = beatBefore + beatDuration / 2;
+        let numerator =
+          elapsedSeconds < midpoint
+            ? elapsedSeconds - beatBefore
+            : beatAfter - elapsedSeconds;
+        this.beatProximity = numerator / (beatDuration / 2);
+      } else {
+        this.beatProximity = 0;
+      }
+
+      // time-based animation
       this.pyramidRollFrac = frac(2 * this.elapsedSeconds(input.now) * 0.1);
 
-      // read input
+      // input
       if (input.playerOne.DPAD.left) {
         this.currentRotationTurns -= 0.01;
       }
@@ -128,7 +168,7 @@ class GameState {
       pyramids: [
         {
           transform: mat4x4fFromArray(pyramidTransform),
-          height: 0.4,
+          height: 0.4 + 0.05 * this.beatProximity,
           radii: d.vec2f(0.15, 0.1),
           color: d.vec3f(0.2, 0.6, 0.2),
         },
@@ -155,7 +195,6 @@ async function init() {
   const startTimeMillis = performance.now();
   const game = new GameState({
     startTimeMillis,
-    lastTimeMillis: startTimeMillis,
     audioCtx,
     renderer,
     assets,
