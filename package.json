@@ -4,24 +4,21 @@
   "version": "1.0.0",
   "description": "a jazzy 3D Super Hexagon clone",
   "type": "module",
-
   "scripts": {
     "dev": "concurrently \"vite --port 5173 --strictPort\" \"rcade dev http://localhost:5173\"",
     "build": "vite build",
     "format": "prettier --write .",
     "typecheck": "tsc --build --noEmit",
     "typecheck:watch": "tsc --build --noEmit --watch",
-
     "download-audio": "./scripts/download-audio.sh",
     "beats-json": "./scripts/extract_beats.py ./public"
   },
-
   "dependencies": {
     "@rcade/plugin-input-classic": "^0.2.1",
+    "@rcade/plugin-input-spinners": "^0.2.2",
     "typegpu": "^0.11.2",
     "wgpu-matrix": "^3.4.2"
   },
-
   "devDependencies": {
     "@webgpu/types": "^0.1.69",
     "concurrently": "^9.0.0",

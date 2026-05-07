@@ -11,6 +11,9 @@ importers:
       '@rcade/plugin-input-classic':
         specifier: ^0.2.1
         version: 0.2.3(typescript@5.9.3)
+      '@rcade/plugin-input-spinners':
+        specifier: ^0.2.2
+        version: 0.2.2(typescript@5.9.3)
       typegpu:
         specifier: ^0.11.2
         version: 0.11.2
@@ -391,6 +394,11 @@ packages:
 
   '@rcade/plugin-input-classic@0.2.3':
     resolution: {integrity: sha512-HEpnhh0HyCMZgLJEzeusVQ/zbxNrfcwZ1plAiGu4a6NSdmYiLGSy4ESPICTNTBWeOR1yATUtN/A70LWXOdmHRQ==}
+    peerDependencies:
+      typescript: ^5.0.0
+
+  '@rcade/plugin-input-spinners@0.2.2':
+    resolution: {integrity: sha512-O1j/a+UNoeS2ZB/T7D0LpWLGGHh+EqEtR+xluijB8icT13VN3qpPhb9cOKIq9iOfwvwyvm03pgiJ9YP4jMM/pA==}
     peerDependencies:
       typescript: ^5.0.0
 
@@ -1266,6 +1274,11 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@rcade/plugin-input-classic@0.2.3(typescript@5.9.3)':
+    dependencies:
+      '@rcade/sdk': 0.2.2(typescript@5.9.3)
+      typescript: 5.9.3
+
+  '@rcade/plugin-input-spinners@0.2.2(typescript@5.9.3)':
     dependencies:
       '@rcade/sdk': 0.2.2(typescript@5.9.3)
       typescript: 5.9.3

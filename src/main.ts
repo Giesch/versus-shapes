@@ -1,6 +1,7 @@
 import "./style.css";
 
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
+import * as spinners from "@rcade/plugin-input-spinners";
 
 import { Renderer, mat4x4fFromArray } from "./renderer";
 import * as audio from "./audio";
@@ -121,7 +122,7 @@ class GameState {
       }
 
       // time-based animation
-      this.pyramidRollFrac = frac(2 * this.elapsedSeconds(input.now) * 0.1);
+      this.pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
 
       // input
       if (input.playerOne.DPAD.left) {
@@ -130,6 +131,9 @@ class GameState {
       if (input.playerOne.DPAD.right) {
         this.currentRotationTurns += 0.01;
       }
+
+      let spinDelta = spinners.PLAYER_1.SPINNER.consume_step_delta();
+      this.currentRotationTurns += spinDelta * 0.01;
     }
   }
 
@@ -150,7 +154,7 @@ class GameState {
 
     // update pyramid orbit & rotation
     const pyramidStart = mat4.translation(
-      vec3.create(1.15 + 0.1 * this.beatProximity, 0, 0),
+      vec3.create(1.15 - 0.25 + 0.1 * this.beatProximity, 0, 0),
     );
     const pyramidUp = mat4.rotationZ(-Math.PI / 2);
     const pyramidLocalRoll = mat4.rotationX(TAU * this.pyramidRollFrac);
@@ -177,7 +181,7 @@ class GameState {
       spheres: [
         {
           center: d.vec3f(0.0, 0.0, 0.0),
-          radius: 1.0,
+          radius: 0.75,
           color: d.vec3f(0.2, 0.2, 0.6),
         },
       ],
@@ -194,12 +198,8 @@ async function init() {
   const renderer = await Renderer.init();
 
   const startTimeMillis = performance.now();
-  const game = new GameState({
-    startTimeMillis,
-    audioCtx,
-    renderer,
-    assets,
-  });
+
+  const game = new GameState({ startTimeMillis, audioCtx, renderer, assets });
 
   game.playAudio(game.assets.versusShapes);
 
