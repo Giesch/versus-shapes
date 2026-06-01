@@ -17,6 +17,55 @@ const TAU = Math.PI * 2;
 const SUN_START = vec3.create(4, 5, 2);
 const frac = (x: number): number => x - Math.floor(x);
 
+// pentagon obstacle: 5 boxes forming the polygon outline (one box per edge)
+const PENTA_SIDES = 5;
+const PENTA_INTERIOR = TAU / PENTA_SIDES;
+const START_ANGLE = Math.PI / 2; // a vertex points up
+const BAR_THICKNESS = 0.05;
+const BAR_DEPTH = 0.15;
+const DESCENT_RATE = 0.3;
+
+interface ObstacleBox {
+  transform: Mat4;
+  radii: Vec3;
+}
+
+/**
+ * Build the edge boxes of a regular pentagon with circumradius `r`,
+ * centered on the origin in the XY plane. Each box's `transform` is the
+ * world->local matrix (inverse of the model matrix), matching the convention
+ * used by the GPU shader and collision SDFs.
+ *
+ * Passing a `gapIndex` (0..SIDES-1) omits that one edge, leaving a gap in the
+ * outline while the remaining sides keep their pentagon positions.
+ */
+function buildPentagon(r: number, gapIndex: number): ObstacleBox[] {
+  const apothem = r * Math.cos(Math.PI / PENTA_SIDES);
+  const halfLen = r * Math.sin(Math.PI / PENTA_SIDES) + BAR_THICKNESS / 2;
+  const boxes: ObstacleBox[] = [];
+  for (let i = 0; i < PENTA_SIDES; i++) {
+    if (i === gapIndex) continue;
+
+    const phiMid = START_ANGLE + (i + 0.5) * PENTA_INTERIOR;
+    const midpoint = vec3.create(
+      apothem * Math.cos(phiMid),
+      apothem * Math.sin(phiMid),
+      0,
+    );
+    const edgeAngle = phiMid + Math.PI / 2;
+    const model = mat4.multiply(
+      mat4.translation(midpoint),
+      mat4.rotationZ(edgeAngle),
+    );
+    boxes.push({
+      transform: mat4.invert(model),
+      radii: vec3.create(halfLen, BAR_THICKNESS, BAR_DEPTH),
+    });
+  }
+
+  return boxes;
+}
+
 /** initial dependencies to construct a GameState */
 interface GameStateDeps {
   startTimeMillis: number;
@@ -62,8 +111,9 @@ class GameState {
   pyramidRollFrac: number;
   pyramidTransform: Mat4;
 
-  obstacleRadius: number;
-  boxTransform: Mat4;
+  /** circumradius of the pentagon obstacle; shrinks toward 0 over time */
+  pentagonRadius: number;
+  boxes: ObstacleBox[];
 
   /** the beat timestamps from essentia */
   beats: number[];
@@ -83,8 +133,8 @@ class GameState {
     this.pyramidRollFrac = 0.0;
     this.pyramidTransform = mat4.create(0);
 
-    this.obstacleRadius = 0;
-    this.boxTransform = mat4.create(0);
+    this.pentagonRadius = 0;
+    this.boxes = [];
 
     this.audioCtx = deps.audioCtx;
     this.musicGain = this.audioCtx.createGain();
@@ -161,23 +211,36 @@ class GameState {
       );
 
       // update obstacles
-      this.obstacleRadius = 1.75 - elapsedSeconds * 0.15;
-      this.boxTransform = mat4.translation(
-        vec3.create(0, -this.obstacleRadius, 0),
+      let descent = elapsedSeconds * DESCENT_RATE;
+      let pentagonGap = 0;
+      // reset the pentagon when it descends into the sphere
+      // TODO handle this in a more sensible way;
+      // track the properties of polygons at a higher level
+      while (descent > 1.75) {
+        descent -= 1.75;
+        pentagonGap += 1;
+      }
+      this.pentagonRadius = 1.75 - descent;
+      this.boxes = buildPentagon(
+        this.pentagonRadius,
+        pentagonGap % PENTA_SIDES,
       );
 
-      // check collision
+      // check collision against every edge box
       const pyramidHeight = 0.2 + 0.025 * this.beatProximity;
-      const collided = collision.pyramidVsBox(
-        this.pyramidTransform,
-        pyramidHeight,
-        0.075,
-        0.05,
-        this.boxTransform,
-        vec3.create(0.5, 0.1, 0.15),
-      );
-      if (collided) {
-        this.paused = true;
+      for (const box of this.boxes) {
+        const collided = collision.pyramidVsBox(
+          this.pyramidTransform,
+          pyramidHeight,
+          0.075,
+          0.05,
+          box.transform,
+          box.radii,
+        );
+        if (collided) {
+          this.paused = true;
+          break;
+        }
       }
     }
   }
@@ -215,13 +278,11 @@ class GameState {
           color: d.vec3f(0.2, 0.2, 0.6),
         },
       ],
-      boxes: [
-        {
-          transform: mat4x4fFromArray(this.boxTransform),
-          radii: d.vec3f(0.5, 0.1, 0.15),
-          color: d.vec3f(0.6, 0.2, 0.2),
-        },
-      ],
+      boxes: this.boxes.map((b) => ({
+        transform: mat4x4fFromArray(b.transform),
+        radii: d.vec3f(b.radii[0], b.radii[1], b.radii[2]),
+        color: d.vec3f(0.6, 0.2, 0.2),
+      })),
     });
   }
 }

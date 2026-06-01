@@ -69,6 +69,7 @@ const triangleSdf = (p: d.v3f, a: d.v3f, b: d.v3f, c: d.v3f): number => {
     const dn = std.dot(nor, pa);
     d2 = (dn * dn) / std.dot(nor, nor);
   }
+
   return std.sqrt(d2);
 };
 
@@ -115,6 +116,7 @@ const pyramidSdf = (p: d.v3f, pyramid: d.Infer<typeof Pyramid>): number => {
     );
     result = std.min(std.min(dxTri, dzTri), baseDist);
   }
+
   return result;
 };
 
