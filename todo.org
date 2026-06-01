@@ -1,0 +1,21 @@
+#+title: Todo
+
+* Now
+- [-] Collision
+  - [X] check against a single obstacle
+  - [ ] make a pentagon of obstacles with a gap to pass through
+
+* Soon
+- [ ] Level Editor
+  - show waveform with tracker line
+  - show spawn/dodge times for individual obstacles
+
+- [ ] add animated stars background
+
+- [ ] switch to using koota?
+  what other components would this game have?
+  ie, is it complex enough to warrant an ECS?
+  - background elements (ie the stars)
+  - the camera / camera effects
+
+* Someday

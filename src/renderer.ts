@@ -101,6 +101,9 @@ export class Renderer {
     this.boxCount = 1;
   }
 
+  /**
+   * Sets up canvas with WebGPU graphics pipeline
+   */
   public static async init(): Promise<Renderer> {
     const canvas = document.querySelector("canvas") as HTMLCanvasElement;
     const adapter = await navigator.gpu?.requestAdapter({
@@ -170,8 +173,8 @@ export class Renderer {
       boxesBuffer,
     });
 
-    const ro = new ResizeObserver(sizeCanvas);
-    ro.observe(canvas);
+    const resizeObserver = new ResizeObserver(sizeCanvas);
+    resizeObserver.observe(canvas);
 
     if (import.meta.hot) {
       /// TODO modify this to not use closure state for these
@@ -210,7 +213,7 @@ export class Renderer {
       });
 
       import.meta.hot.accept("./shaders/schemas.ts", () => {
-        import.meta.hot!.invalidate();
+        import.meta.hot?.invalidate();
       });
     }
 

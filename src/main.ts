@@ -4,8 +4,9 @@ import { PLAYER_1 } from "@rcade/plugin-input-classic";
 import * as spinners from "@rcade/plugin-input-spinners";
 
 import { Renderer, mat4x4fFromArray } from "./renderer";
+import * as collision from "./collision";
 import * as audio from "./audio";
-import { mat4, vec3, type Vec3 } from "wgpu-matrix";
+import { mat4, vec3, type Vec3, type Mat4 } from "wgpu-matrix";
 import { d } from "typegpu";
 
 import versusShapesJson from "./data/versus-shapes.beats.json";
@@ -39,6 +40,8 @@ interface FrameInput {
 }
 
 class GameState {
+  paused: boolean;
+
   /** the initial value of performance.now() at app start */
   startTimeMillis: number;
   /** the value of performance.now() at the top of the previous frame */
@@ -54,9 +57,13 @@ class GameState {
 
   sunPos: Vec3;
 
-  // NOTE 0.0 == 1.0 == pointing left
+  /** the player's input rotation; 0.0 == 1.0 == pointing left */
   currentRotationTurns: number;
   pyramidRollFrac: number;
+  pyramidTransform: Mat4;
+
+  obstacleRadius: number;
+  boxTransform: Mat4;
 
   /** the beat timestamps from essentia */
   beats: number[];
@@ -74,6 +81,10 @@ class GameState {
 
     this.currentRotationTurns = 0.25;
     this.pyramidRollFrac = 0.0;
+    this.pyramidTransform = mat4.create(0);
+
+    this.obstacleRadius = 0;
+    this.boxTransform = mat4.create(0);
 
     this.audioCtx = deps.audioCtx;
     this.musicGain = this.audioCtx.createGain();
@@ -88,9 +99,13 @@ class GameState {
     this.beats = versusShapesJson.beats;
     this.beatIndex = 0;
     this.beatProximity = 0;
+
+    this.paused = false;
   }
 
   update(input: FrameInput): void {
+    if (this.paused) return;
+
     const deltaTimeMillis = input.now - this.lastTimeMillis;
     this.frameTimeMillis += deltaTimeMillis;
     this.lastTimeMillis = input.now;
@@ -126,8 +141,44 @@ class GameState {
       // time-based animation
       this.pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
 
-      // input
+      // read input
       this.currentRotationTurns += input.spinDelta * 0.01;
+
+      // update player/pyramid orbit & rotation
+      const pyramidStart = mat4.translation(
+        vec3.create(1.15 - 0.5 + 0.1 * this.beatProximity, 0, 0),
+      );
+      const pyramidUp = mat4.rotationZ(-Math.PI / 2);
+      const pyramidLocalRoll = mat4.rotationX(TAU * this.pyramidRollFrac);
+      const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
+      const pyramidOrbitRotation = mat4.rotationZ(
+        TAU * this.currentRotationTurns,
+      );
+      mat4.multiply(
+        mat4.multiply(pyramidLocalRotation, pyramidStart),
+        pyramidOrbitRotation,
+        this.pyramidTransform,
+      );
+
+      // update obstacles
+      this.obstacleRadius = 1.75 - elapsedSeconds * 0.15;
+      this.boxTransform = mat4.translation(
+        vec3.create(0, -this.obstacleRadius, 0),
+      );
+
+      // check collision
+      const pyramidHeight = 0.2 + 0.025 * this.beatProximity;
+      const collided = collision.pyramidVsBox(
+        this.pyramidTransform,
+        pyramidHeight,
+        0.075,
+        0.05,
+        this.boxTransform,
+        vec3.create(0.5, 0.1, 0.15),
+      );
+      if (collided) {
+        this.paused = true;
+      }
     }
   }
 
@@ -146,27 +197,12 @@ class GameState {
     const sunRotation = mat4.rotationY(TAU * this.elapsedSeconds(now) * 0.1);
     vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
 
-    // update pyramid orbit & rotation
-    const pyramidStart = mat4.translation(
-      vec3.create(1.15 - 0.5 + 0.1 * this.beatProximity, 0, 0),
-    );
-    const pyramidUp = mat4.rotationZ(-Math.PI / 2);
-    const pyramidLocalRoll = mat4.rotationX(TAU * this.pyramidRollFrac);
-    const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
-    const pyramidOrbitRotation = mat4.rotationZ(
-      TAU * this.currentRotationTurns,
-    );
-    const pyramidTransform = mat4.multiply(
-      mat4.multiply(pyramidLocalRotation, pyramidStart),
-      pyramidOrbitRotation,
-    );
-
     this.renderer.draw({
       elapsedSeconds: this.elapsedSeconds(now),
       lightPosition: this.sunPos,
       pyramids: [
         {
-          transform: mat4x4fFromArray(pyramidTransform),
+          transform: mat4x4fFromArray(this.pyramidTransform),
           height: 0.2 + 0.025 * this.beatProximity,
           radii: d.vec2f(0.075, 0.05),
           color: d.vec3f(0.2, 0.6, 0.2),
@@ -179,7 +215,13 @@ class GameState {
           color: d.vec3f(0.2, 0.2, 0.6),
         },
       ],
-      boxes: [],
+      boxes: [
+        {
+          transform: mat4x4fFromArray(this.boxTransform),
+          radii: d.vec3f(0.5, 0.1, 0.15),
+          color: d.vec3f(0.6, 0.2, 0.2),
+        },
+      ],
     });
   }
 }
