@@ -229,14 +229,15 @@ class GameState {
       // check collision against every edge box
       const pyramidHeight = 0.2 + 0.025 * this.beatProximity;
       for (const box of this.boxes) {
-        const collided = collision.pyramidVsBox(
-          this.pyramidTransform,
-          pyramidHeight,
-          0.075,
-          0.05,
-          box.transform,
-          box.radii,
-        );
+        const collided = false;
+        // const collided = collision.pyramidVsBox(
+        //   this.pyramidTransform,
+        //   pyramidHeight,
+        //   0.075,
+        //   0.05,
+        //   box.transform,
+        //   box.radii,
+        // );
         if (collided) {
           this.paused = true;
           break;
