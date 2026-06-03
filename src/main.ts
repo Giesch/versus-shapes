@@ -160,6 +160,11 @@ class GameState {
     this.frameTimeMillis += deltaTimeMillis;
     this.lastTimeMillis = input.now;
 
+    // read spinner input
+    // NOTE we need to avoid applying this input multiple times per render frame,
+    // even if we want to run multiple fixed timesteps
+    this.currentRotationTurns += input.spinDelta * 0.01;
+
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       // timestep
       this.frameTimeMillis -= MILLIS_PER_FRAME;
@@ -190,9 +195,6 @@ class GameState {
 
       // time-based animation
       this.pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
-
-      // read input
-      this.currentRotationTurns += input.spinDelta * 0.01;
 
       // update player/pyramid orbit & rotation
       const pyramidStart = mat4.translation(
