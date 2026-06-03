@@ -176,6 +176,10 @@ const calculateNormal = (p: d.v3f): d.v3f => {
   );
 };
 
+// NOTE this looks too bright locally,
+// but the RCade CRT is very dark
+//   maybe it would be better to brighten everything as a post-processing effect?
+//   or make the object colors individually brighter?
 const basicLighting = (
   pos: d.v3f,
   rayDir: d.v3f,
@@ -189,7 +193,7 @@ const basicLighting = (
   const viewDir = rayDir.mul(-1);
   const lightColor = d.vec3f(1, 1, 1);
 
-  const ambientStrength = 0.75;
+  const ambientStrength = 0.85;
   const ambient = lightColor.mul(ambientStrength);
 
   const diffuse = lightColor.mul(std.max(0, std.dot(normal, lightDir)));

@@ -14,9 +14,6 @@ importers:
       '@rcade/plugin-input-spinners':
         specifier: ^0.2.2
         version: 0.2.2(typescript@5.9.3)
-      koota:
-        specifier: ^0.6.6
-        version: 0.6.6
       typegpu:
         specifier: ^0.11.2
         version: 0.11.2
@@ -886,17 +883,6 @@ packages:
     resolution: {integrity: sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA==}
     engines: {node: '>=6'}
     hasBin: true
-
-  koota@0.6.6:
-    resolution: {integrity: sha512-Fn8lSooH3u9TIP+eAMugFrOju40Ec70+sB7x1eZBB3H0Lki2hyIbFAodk3NDB/RIRzoMs54O4422BVN6SbtWfw==}
-    peerDependencies:
-      '@types/react': '>=18.0.0'
-      react: '>=18.0.0'
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-      react:
-        optional: true
 
   lazyness@1.2.0:
     resolution: {integrity: sha512-KenL6EFbwxBwRxG93t0gcUyi0Nw0Ub31FJKN1laA4UscdkL1K1AxUd0gYZdcLU3v+x+wcFi4uQKS5hL+fk500g==}
@@ -1804,8 +1790,6 @@ snapshots:
       argparse: 2.0.1
 
   jsesc@3.1.0: {}
-
-  koota@0.6.6: {}
 
   lazyness@1.2.0: {}
 
