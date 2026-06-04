@@ -105,6 +105,8 @@ class GameState {
   assets: Assets;
 
   sunPos: Vec3;
+  /** a dimmer fill light, kept exactly opposite the sun */
+  moonPos: Vec3;
 
   /** the player's input rotation; 0.0 == 1.0 == pointing left */
   currentRotationTurns: number;
@@ -145,6 +147,7 @@ class GameState {
     this.assets = deps.assets;
 
     this.sunPos = vec3.clone(SUN_START);
+    this.moonPos = vec3.create();
 
     this.beats = versusShapesJson.beats;
     this.beatIndex = 0;
@@ -261,10 +264,12 @@ class GameState {
   draw(now: number): void {
     const sunRotation = mat4.rotationY(TAU * this.elapsedSeconds(now) * 0.1);
     vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
+    vec3.negate(this.sunPos, this.moonPos);
 
     this.renderer.draw({
       elapsedSeconds: this.elapsedSeconds(now),
       lightPosition: this.sunPos,
+      moonPosition: this.moonPos,
       pyramids: [
         {
           transform: mat4x4fFromArray(this.pyramidTransform),

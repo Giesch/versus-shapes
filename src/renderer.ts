@@ -57,6 +57,7 @@ export interface RendererDeps {
 export interface DrawArgs {
   elapsedSeconds: number;
   lightPosition: Vec3;
+  moonPosition: Vec3;
   pyramids: d.Infer<typeof Pyramid>[];
   spheres: d.Infer<typeof Sphere>[];
   boxes: d.Infer<typeof Box>[];
@@ -220,7 +221,7 @@ export class Renderer {
     return renderer;
   }
 
-  public draw({ lightPosition, pyramids, spheres, boxes }: DrawArgs) {
+  public draw({ lightPosition, moonPosition, pyramids, spheres, boxes }: DrawArgs) {
     const width = this.canvas.width;
     const height = this.canvas.height;
     const aspect = width / Math.max(1, height);
@@ -240,6 +241,11 @@ export class Renderer {
         lightPosition[0],
         lightPosition[1],
         lightPosition[2],
+      ),
+      moonPosition: d.vec3f(
+        moonPosition[0],
+        moonPosition[1],
+        moonPosition[2],
       ),
       pyramidCount: pyramids.length,
       sphereCount: spheres.length,

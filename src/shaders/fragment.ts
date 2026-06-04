@@ -180,21 +180,21 @@ const calculateNormal = (p: d.v3f): d.v3f => {
 // but the RCade CRT is very dark
 //   maybe it would be better to brighten everything as a post-processing effect?
 //   or make the object colors individually brighter?
-const basicLighting = (
+/** the moon's brightness as a proportion of the sun's */
+const MOON_BRIGHTNESS = d.f32(0.25);
+
+/** diffuse + specular contribution from a single light, scaled by intensity */
+const pointLight = (
+  normal: d.v3f,
+  viewDir: d.v3f,
   pos: d.v3f,
-  rayDir: d.v3f,
-  objColor: d.v3f,
   lightPos: d.v3f,
+  intensity: number,
 ): d.v3f => {
   "use gpu";
 
-  const normal = calculateNormal(pos);
   const lightDir = std.normalize(lightPos.sub(pos));
-  const viewDir = rayDir.mul(-1);
   const lightColor = d.vec3f(1, 1, 1);
-
-  const ambientStrength = 0.85;
-  const ambient = lightColor.mul(ambientStrength);
 
   const diffuse = lightColor.mul(std.max(0, std.dot(normal, lightDir)));
 
@@ -207,10 +207,36 @@ const basicLighting = (
   );
   const specular = lightColor.mul(specularStrength * specIntensity);
 
-  return ambient.add(diffuse).add(specular).mul(objColor);
+  return diffuse.add(specular).mul(intensity);
 };
 
-const rayMarch = (ro: d.v3f, rd: d.v3f, lightPos: d.v3f): d.v3f => {
+const basicLighting = (
+  pos: d.v3f,
+  rayDir: d.v3f,
+  objColor: d.v3f,
+  sunPos: d.v3f,
+  moonPos: d.v3f,
+): d.v3f => {
+  "use gpu";
+
+  const normal = calculateNormal(pos);
+  const viewDir = rayDir.mul(-1);
+
+  const ambientStrength = 0.85;
+  const ambient = d.vec3f(1, 1, 1).mul(ambientStrength);
+
+  return ambient
+    .add(pointLight(normal, viewDir, pos, sunPos, 1))
+    .add(pointLight(normal, viewDir, pos, moonPos, MOON_BRIGHTNESS))
+    .mul(objColor);
+};
+
+const rayMarch = (
+  ro: d.v3f,
+  rd: d.v3f,
+  sunPos: d.v3f,
+  moonPos: d.v3f,
+): d.v3f => {
   "use gpu";
 
   let traveled = d.f32(0);
@@ -220,7 +246,7 @@ const rayMarch = (ro: d.v3f, rd: d.v3f, lightPos: d.v3f): d.v3f => {
     const hit = closestShape(p);
 
     if (hit.distance < MIN_HIT_DISTANCE) {
-      return basicLighting(p, rd, hit.color, lightPos);
+      return basicLighting(p, rd, hit.color, sunPos, moonPos);
     }
 
     if (traveled >= MAX_DISTANCE) {
@@ -241,7 +267,12 @@ const sampleAt = (ndc: d.v2f): d.v3f => {
   const world = worldH.xyz.div(worldH.w);
   const dir = std.normalize(world.sub(params.camera.position));
 
-  return rayMarch(params.camera.position, dir, params.lightPosition);
+  return rayMarch(
+    params.camera.position,
+    dir,
+    params.lightPosition,
+    params.moonPosition,
+  );
 };
 
 /** the square root of the number of samples per pixel */
