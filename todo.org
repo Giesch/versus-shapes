@@ -1,11 +1,21 @@
 #+title: Todo
 
 * Now
-- [-] Collision
+- [ ] now it's too bright on the CRT
+  - [ ] try re-darkening object colors
+  - [ ] try reducing ambient light
+  - [ ] try dimming the moon
+
+- [X] Collision
   - [X] check against a single obstacle
-  - [ ] make a pentagon of obstacles with a gap to pass through
+  - [X] make a pentagon of obstacles with a gap to pass through
 
 * Soon
+- [ ] restart the game on death
+  - [ ] pause music
+    later, let it keep playing with an effect on it to show you're dead
+  - [ ] after a timer, restart the game and the music
+
 - [ ] Level Editor
   - show waveform with tracker line
   - show spawn/dodge times for individual obstacles

@@ -275,20 +275,20 @@ class GameState {
           transform: mat4x4fFromArray(this.pyramidTransform),
           height: 0.2 + 0.025 * this.beatProximity,
           radii: d.vec2f(0.075, 0.05),
-          color: d.vec3f(0.3, 0.7, 0.3),
+          color: d.vec3f(0.2, 0.6, 0.2),
         },
       ],
       spheres: [
         {
           center: d.vec3f(0.0, 0.0, 0.0),
           radius: 1 - 0.5,
-          color: d.vec3f(0.3, 0.3, 0.7),
+          color: d.vec3f(0.2, 0.2, 0.6),
         },
       ],
       boxes: this.boxes.map((b) => ({
         transform: mat4x4fFromArray(b.transform),
         radii: d.vec3f(b.radii[0], b.radii[1], b.radii[2]),
-        color: d.vec3f(0.7, 0.3, 0.3),
+        color: d.vec3f(0.6, 0.2, 0.2),
       })),
     });
   }
