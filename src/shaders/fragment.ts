@@ -176,12 +176,8 @@ const calculateNormal = (p: d.v3f): d.v3f => {
   );
 };
 
-// NOTE this looks too bright locally,
-// but the RCade CRT is very dark
-//   maybe it would be better to brighten everything as a post-processing effect?
-//   or make the object colors individually brighter?
 /** the moon's brightness as a proportion of the sun's */
-const MOON_BRIGHTNESS = d.f32(0.25);
+const MOON_BRIGHTNESS = d.f32(0.1);
 
 /** diffuse + specular contribution from a single light, scaled by intensity */
 const pointLight = (

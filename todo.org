@@ -1,8 +1,9 @@
 #+title: Todo
 
 * Now
-- [ ] now it's too bright on the CRT
-  - [ ] try re-darkening object colors
+- [-] now it's too bright on the CRT
+  - [X] try re-darkening object colors
+    this results in sides appearing to drop out again
   - [ ] try reducing ambient light
   - [ ] try dimming the moon
 
