@@ -177,7 +177,7 @@ const calculateNormal = (p: d.v3f): d.v3f => {
 };
 
 /** the moon's brightness as a proportion of the sun's */
-const MOON_BRIGHTNESS = d.f32(0.1);
+const MOON_BRIGHTNESS = d.f32(0.2);
 
 /** diffuse + specular contribution from a single light, scaled by intensity */
 const pointLight = (
@@ -221,10 +221,10 @@ const basicLighting = (
   const ambientStrength = 0.85;
   const ambient = d.vec3f(1, 1, 1).mul(ambientStrength);
 
-  return ambient
-    .add(pointLight(normal, viewDir, pos, sunPos, 1))
-    .add(pointLight(normal, viewDir, pos, moonPos, MOON_BRIGHTNESS))
-    .mul(objColor);
+  const sunlight = pointLight(normal, viewDir, pos, sunPos, 1);
+  const moonlight = pointLight(normal, viewDir, pos, moonPos, MOON_BRIGHTNESS);
+
+  return ambient.add(sunlight).add(moonlight).mul(objColor);
 };
 
 const rayMarch = (
