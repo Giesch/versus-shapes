@@ -10,6 +10,8 @@ import { mat4, vec3, type Vec3, type Mat4 } from "wgpu-matrix";
 import { d } from "typegpu";
 
 import versusShapesJson from "./data/versus-shapes.beats.json";
+import { level } from "./data/versus-shapes.level.ts";
+import { type LevelObstacle } from "./level.ts";
 
 const MILLIS_PER_FRAME = 16.6;
 
@@ -23,7 +25,6 @@ const PENTA_INTERIOR = TAU / PENTA_SIDES;
 const START_ANGLE = Math.PI / 2; // a vertex points up
 const BAR_THICKNESS = 0.05;
 const BAR_DEPTH = 0.15;
-const DESCENT_RATE = 0.3;
 
 interface ObstacleBox {
   transform: Mat4;
@@ -113,8 +114,8 @@ class GameState {
   pyramidRollFrac: number;
   pyramidTransform: Mat4;
 
-  /** circumradius of the pentagon obstacle; shrinks toward 0 over time */
-  pentagonRadius: number;
+  /** active obstacles loaded from the level data */
+  obstacles: LevelObstacle[];
   boxes: ObstacleBox[];
 
   /** the beat timestamps from essentia */
@@ -135,7 +136,7 @@ class GameState {
     this.pyramidRollFrac = 0.0;
     this.pyramidTransform = mat4.create(0);
 
-    this.pentagonRadius = 0;
+    this.obstacles = level.obstacles;
     this.boxes = [];
 
     this.audioCtx = deps.audioCtx;
@@ -215,21 +216,25 @@ class GameState {
         this.pyramidTransform,
       );
 
-      // update obstacles
-      let descent = elapsedSeconds * DESCENT_RATE;
-      let pentagonGap = 0;
-      // reset the pentagon when it descends into the sphere
-      // TODO handle this in a more sensible way;
-      // track the properties of polygons at a higher level
-      while (descent > 1.75) {
-        descent -= 1.75;
-        pentagonGap += 1;
+      // update obstacles: each active obstacle shrinks from its initial radius
+      // toward 0, then despawns once it reaches 0
+      this.boxes = [];
+      for (const o of this.obstacles) {
+        const age = elapsedSeconds - o.spawnTime;
+        // not spawned yet
+        if (age < 0) continue;
+
+        const radius = o.radius - age * o.descentRate;
+        // shrunk away -> despawned
+        if (radius <= 0) continue;
+
+        switch (o.type) {
+          case "pentagon": {
+            const pentagon = buildPentagon(radius, o.gapIndex % PENTA_SIDES);
+            this.boxes.push(...pentagon);
+          }
+        }
       }
-      this.pentagonRadius = 1.75 - descent;
-      this.boxes = buildPentagon(
-        this.pentagonRadius,
-        pentagonGap % PENTA_SIDES,
-      );
 
       // check collision against every edge box
       const pyramidHeight = 0.2 + 0.025 * this.beatProximity;

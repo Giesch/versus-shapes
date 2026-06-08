@@ -221,7 +221,13 @@ export class Renderer {
     return renderer;
   }
 
-  public draw({ lightPosition, moonPosition, pyramids, spheres, boxes }: DrawArgs) {
+  public draw({
+    lightPosition,
+    moonPosition,
+    pyramids,
+    spheres,
+    boxes,
+  }: DrawArgs) {
     const width = this.canvas.width;
     const height = this.canvas.height;
     const aspect = width / Math.max(1, height);
@@ -242,11 +248,7 @@ export class Renderer {
         lightPosition[1],
         lightPosition[2],
       ),
-      moonPosition: d.vec3f(
-        moonPosition[0],
-        moonPosition[1],
-        moonPosition[2],
-      ),
+      moonPosition: d.vec3f(moonPosition[0], moonPosition[1], moonPosition[2]),
       pyramidCount: pyramids.length,
       sphereCount: spheres.length,
       boxCount: boxes.length,
