@@ -3,15 +3,17 @@ import "./style.css";
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
 import * as spinners from "@rcade/plugin-input-spinners";
 
-import { Renderer, mat4x4fFromArray } from "./renderer";
+import { Renderer, mat4x4fFromArray, type DrawArgs } from "./renderer";
 import * as collision from "./collision";
 import * as audio from "./audio";
-import { mat4, vec3, type Vec3, type Mat4 } from "wgpu-matrix";
+import { mat4, vec3, type Vec3, type Mat4, vec2 } from "wgpu-matrix";
 import { d } from "typegpu";
+import * as koota from "koota";
 
 import versusShapesJson from "./data/versus-shapes.beats.json";
 import { level } from "./data/versus-shapes.level.ts";
 import { type LevelObstacle } from "./level.ts";
+import * as traits from "./traits";
 
 const MILLIS_PER_FRAME = 16.6;
 
@@ -43,6 +45,10 @@ interface ObstacleBox {
 function buildPentagon(r: number, gapIndex: number): ObstacleBox[] {
   const apothem = r * Math.cos(Math.PI / PENTA_SIDES);
   const halfLen = r * Math.sin(Math.PI / PENTA_SIDES) + BAR_THICKNESS / 2;
+
+  // TODO is there a way to use i + apothem + halfLen to spawn & update components?
+  // maybe an ordered relation with metadata?
+
   const boxes: ObstacleBox[] = [];
   for (let i = 0; i < PENTA_SIDES; i++) {
     if (i === gapIndex) continue;
@@ -58,6 +64,7 @@ function buildPentagon(r: number, gapIndex: number): ObstacleBox[] {
       mat4.translation(midpoint),
       mat4.rotationZ(edgeAngle),
     );
+
     boxes.push({
       transform: mat4.invert(model),
       radii: vec3.create(halfLen, BAR_THICKNESS, BAR_DEPTH),
@@ -127,7 +134,51 @@ class GameState {
   beatIndex: number;
   beatProximity: number;
 
+  world: koota.World;
+
   constructor(deps: GameStateDeps) {
+    // koota world
+    this.world = koota.createWorld();
+    this.world.add(traits.BeatProximity({ beatProximity: 0 }));
+
+    // spawn player
+    this.world.spawn(
+      traits.IsPlayer,
+      traits.GPUPyramid({
+        transform: mat4.create(),
+        radii: vec2.create(0.075, 0.05),
+        color: vec3.create(0.3, 0.7, 0.3),
+        height: 0.2,
+      }),
+    );
+
+    // spawn pentagon
+    for (const obstacle of level.obstacles) {
+      const gapIndex = obstacle.gapIndex % PENTA_SIDES;
+      const pentagon = this.world.spawn(
+        traits.Obstacle({
+          spawnTime: 0,
+          gapIndex: 0,
+          radius: 1.75,
+          descentRate: 0.3,
+        }),
+      );
+
+      const sides = buildPentagon(obstacle.radius, gapIndex);
+      for (const { transform, radii } of sides) {
+        this.world.spawn(
+          traits.GPUBox({ transform, radii }),
+          traits.BelongsTo(pentagon),
+        );
+      }
+
+      this.world.add(traits.ElapsedSeconds({ elapsedSeconds: 0 }));
+      this.world.add(traits.BeatIndex({ beatIndex: 0 }));
+      this.world.add(traits.BeatProximity({ beatProximity: 0 }));
+    }
+
+    // original, non-koota fields
+
     this.startTimeMillis = deps.startTimeMillis;
     this.lastTimeMillis = deps.startTimeMillis;
     this.frameTimeMillis = 0.0;
@@ -174,6 +225,7 @@ class GameState {
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
       const elapsedSeconds = this.elapsedSeconds(input.now);
+      this.world.set(traits.ElapsedSeconds, { elapsedSeconds });
 
       // advance beat index
       let nextBeat = this.beats[this.beatIndex + 1];
@@ -181,11 +233,12 @@ class GameState {
         this.beatIndex++;
         nextBeat = this.beats[this.beatIndex + 1];
       }
+      this.world.set(traits.BeatIndex, { beatIndex: this.beatIndex });
 
       // set beat proximity
       const beatBefore = this.beats[this.beatIndex];
       const beatAfter = this.beats[this.beatIndex + 1];
-      if (beatAfter) {
+      if (beatAfter !== undefined) {
         let beatDuration = beatAfter - beatBefore;
         let midpoint = beatBefore + beatDuration / 2;
         let numerator =
@@ -196,6 +249,9 @@ class GameState {
       } else {
         this.beatProximity = 0;
       }
+      this.world.set(traits.BeatProximity, {
+        beatProximity: this.beatProximity,
+      });
 
       // time-based animation
       this.pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
@@ -210,10 +266,13 @@ class GameState {
       const pyramidOrbitRotation = mat4.rotationZ(
         TAU * this.currentRotationTurns,
       );
+
+      const player = this.world.queryFirst(traits.IsPlayer)!;
+      const pyramid = player.get(traits.GPUPyramid)!;
       mat4.multiply(
         mat4.multiply(pyramidLocalRotation, pyramidStart),
         pyramidOrbitRotation,
-        this.pyramidTransform,
+        pyramid.transform,
       );
 
       // update obstacles: each active obstacle shrinks from its initial radius
@@ -236,22 +295,54 @@ class GameState {
         }
       }
 
+      this.world
+        .query(traits.Obstacle)
+        .updateEach(([obstacle], obstacleEnt) => {
+          const age = elapsedSeconds - obstacle.spawnTime;
+          const radius = obstacle.radius - age * obstacle.descentRate;
+          if (radius <= 0) {
+            obstacleEnt.destroy();
+            return;
+          }
+
+          // completely recreate the sides
+          this.world
+            .query(traits.GPUBox, traits.BelongsTo(obstacleEnt))
+            .updateEach((_, sideEnt) => {
+              sideEnt.destroy();
+            });
+          // TODO deduplicate this with the original spawn in the constructor?
+          const sides = buildPentagon(radius, obstacle.gapIndex % PENTA_SIDES);
+          for (const { transform, radii } of sides) {
+            this.world.spawn(
+              traits.GPUBox({ transform, radii }),
+              traits.BelongsTo(obstacleEnt),
+            );
+          }
+        });
+
       // check collision against every edge box
-      const pyramidHeight = 0.2 + 0.025 * this.beatProximity;
-      for (const box of this.boxes) {
-        const collided = collision.pyramidVsBox(
-          this.pyramidTransform,
-          pyramidHeight,
-          0.075,
-          0.05,
-          box.transform,
-          box.radii,
-        );
-        if (collided) {
-          this.paused = true;
-          break;
-        }
-      }
+
+      // // FIXME update pyramid height with beat proximity in an earlier step
+      // const { beatProximity } = this.world.get(traits.BeatProximity)!;
+      // const pyramidHeight = 0.2 + 0.025 * beatProximity;
+
+      this.world
+        .query(traits.IsPlayer, traits.GPUPyramid)
+        .readEach(([pyramid]) => {
+          this.world.query(traits.GPUBox).readEach(([box]) => {
+            const collided = collision.pyramidVsBox(
+              pyramid.transform,
+              pyramid.height,
+              pyramid.radii[0],
+              pyramid.radii[1],
+              box.transform,
+              box.radii,
+            );
+
+            this.paused ||= collided;
+          });
+        });
     }
   }
 
@@ -267,34 +358,48 @@ class GameState {
   }
 
   draw(now: number): void {
+    // place lights
     const sunRotation = mat4.rotationY(TAU * this.elapsedSeconds(now) * 0.1);
     vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
     vec3.negate(this.sunPos, this.moonPos);
+
+    // TODO should the d.vec/d.mat types be their own koota trait(s)?
+    // should the renderer use koota?
+
+    const pyramids: DrawArgs["pyramids"] = [];
+    this.world.query(traits.GPUPyramid).readEach(([p]) => {
+      pyramids.push({
+        transform: mat4x4fFromArray(p.transform),
+        radii: d.vec2f(p.radii[0], p.radii[1]),
+        color: d.vec3f(p.color[0], p.color[1], p.color[2]),
+        height: p.height,
+      });
+    });
+
+    const boxes: DrawArgs["boxes"] = [];
+    this.world.query(traits.GPUBox).readEach(([b]) => {
+      boxes.push({
+        transform: mat4x4fFromArray(b.transform),
+        radii: d.vec3f(b.radii[0], b.radii[1], b.radii[2]),
+        color: d.vec3f(0.7, 0.3, 0.3),
+      });
+    });
+
+    const spheres = [
+      {
+        radius: 0.5,
+        center: d.vec3f(0.0, 0.0, 0.0),
+        color: d.vec3f(0.3, 0.3, 0.7),
+      },
+    ];
 
     this.renderer.draw({
       elapsedSeconds: this.elapsedSeconds(now),
       lightPosition: this.sunPos,
       moonPosition: this.moonPos,
-      pyramids: [
-        {
-          transform: mat4x4fFromArray(this.pyramidTransform),
-          height: 0.2 + 0.025 * this.beatProximity,
-          radii: d.vec2f(0.075, 0.05),
-          color: d.vec3f(0.3, 0.7, 0.3),
-        },
-      ],
-      spheres: [
-        {
-          center: d.vec3f(0.0, 0.0, 0.0),
-          radius: 1 - 0.5,
-          color: d.vec3f(0.3, 0.3, 0.7),
-        },
-      ],
-      boxes: this.boxes.map((b) => ({
-        transform: mat4x4fFromArray(b.transform),
-        radii: d.vec3f(b.radii[0], b.radii[1], b.radii[2]),
-        color: d.vec3f(0.7, 0.3, 0.3),
-      })),
+      spheres,
+      pyramids,
+      boxes,
     });
   }
 }

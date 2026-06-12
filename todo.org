@@ -1,15 +1,16 @@
 #+title: Todo
 
 * Now
+- [ ] migrate to koota
+  - [ ] use koota queries for draw() method
+
+  - [ ] remove original unused fields
+
 - [-] now it's too bright on the CRT
   - [X] try re-darkening object colors
     this results in sides appearing to drop out again
   - [ ] try reducing ambient light
   - [ ] try dimming the moon
-
-- [X] Collision
-  - [X] check against a single obstacle
-  - [X] make a pentagon of obstacles with a gap to pass through
 
 * Soon
 - [ ] restart the game on death
