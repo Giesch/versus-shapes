@@ -46,9 +46,6 @@ function buildPentagon(r: number, gapIndex: number): ObstacleBox[] {
   const apothem = r * Math.cos(Math.PI / PENTA_SIDES);
   const halfLen = r * Math.sin(Math.PI / PENTA_SIDES) + BAR_THICKNESS / 2;
 
-  // TODO is there a way to use i + apothem + halfLen to spawn & update components?
-  // maybe an ordered relation with metadata?
-
   const boxes: ObstacleBox[] = [];
   for (let i = 0; i < PENTA_SIDES; i++) {
     if (i === gapIndex) continue;
@@ -164,13 +161,11 @@ class GameState {
         }),
       );
 
-      const sides = buildPentagon(obstacle.radius, gapIndex);
-      for (const { transform, radii } of sides) {
-        this.world.spawn(
-          traits.GPUBox({ transform, radii }),
-          traits.BelongsTo(pentagon),
-        );
-      }
+      this.spawnPolygon({
+        radius: obstacle.radius,
+        gapIndex,
+        polygon: pentagon,
+      });
 
       this.world.add(traits.ElapsedSeconds({ elapsedSeconds: 0 }));
       this.world.add(traits.BeatIndex({ beatIndex: 0 }));
@@ -311,14 +306,12 @@ class GameState {
             .updateEach((_, sideEnt) => {
               sideEnt.destroy();
             });
-          // TODO deduplicate this with the original spawn in the constructor?
-          const sides = buildPentagon(radius, obstacle.gapIndex % PENTA_SIDES);
-          for (const { transform, radii } of sides) {
-            this.world.spawn(
-              traits.GPUBox({ transform, radii }),
-              traits.BelongsTo(obstacleEnt),
-            );
-          }
+
+          this.spawnPolygon({
+            radius,
+            gapIndex: obstacle.gapIndex % PENTA_SIDES,
+            polygon: obstacleEnt,
+          });
         });
 
       // check collision against every edge box
@@ -363,9 +356,6 @@ class GameState {
     vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
     vec3.negate(this.sunPos, this.moonPos);
 
-    // TODO should the d.vec/d.mat types be their own koota trait(s)?
-    // should the renderer use koota?
-
     const pyramids: DrawArgs["pyramids"] = [];
     this.world.query(traits.GPUPyramid).readEach(([p]) => {
       pyramids.push({
@@ -401,6 +391,24 @@ class GameState {
       pyramids,
       boxes,
     });
+  }
+
+  spawnPolygon({
+    radius,
+    gapIndex,
+    polygon,
+  }: {
+    radius: number;
+    gapIndex: number;
+    polygon: koota.Entity;
+  }) {
+    const sides = buildPentagon(radius, gapIndex);
+    for (const { transform, radii } of sides) {
+      this.world.spawn(
+        traits.GPUBox({ transform, radii }),
+        traits.BelongsTo(polygon),
+      );
+    }
   }
 }
 

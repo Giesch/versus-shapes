@@ -12,6 +12,8 @@
   - [ ] try reducing ambient light
   - [ ] try dimming the moon
 
+- [ ] need to get something visual to demo
+
 * Soon
 - [ ] restart the game on death
   - [ ] pause music
@@ -31,3 +33,13 @@
   - the camera / camera effects
 
 * Someday
+- [ ] maybe have the renderer also use koota for its d.vec types?
+  is that compatible with typegpu at all?
+  maybe this is a reason to go to slang? or would plain webgpu still want arrays?
+
+- [ ] is there a nicer way to regenerate polygon sides?
+  use i + apothem + halfLen to spawn & update koota components?
+  maybe a relation with metadata?
+  will need a way to lerp sides between two polygons
+    like a square opens into a gapped pentagon
+    does the current way of regenerating make that easier?
