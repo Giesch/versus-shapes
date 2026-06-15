@@ -12,7 +12,6 @@ import * as koota from "koota";
 
 import versusShapesJson from "./data/versus-shapes.beats.json";
 import { level } from "./data/versus-shapes.level.ts";
-import { type LevelObstacle } from "./level.ts";
 import * as traits from "./traits";
 
 const MILLIS_PER_FRAME = 16.6;
@@ -113,17 +112,8 @@ class GameState {
   /** a dimmer fill light, kept exactly opposite the sun */
   moonPos: Vec3;
 
-  /** active obstacles loaded from the level data */
-  obstacles: LevelObstacle[];
-  boxes: ObstacleBox[];
-
   /** the beat timestamps from essentia */
   beats: number[];
-  /**
-   * the index of the last beat timestamp that we've passed;
-   * we're between this one and the next
-   */
-  beatIndex: number;
   beatProximity: number;
 
   world: koota.World;
@@ -145,37 +135,36 @@ class GameState {
     );
 
     // spawn pentagon
-    for (const obstacle of level.obstacles) {
+    for (const obstacle of level.events.filter((o) => o.atSeconds === 0)) {
       const gapIndex = obstacle.gapIndex % PENTA_SIDES;
+
       const pentagon = this.world.spawn(
         traits.Obstacle({
-          spawnTime: 0,
+          spawnTime: obstacle.atSeconds,
           gapIndex: 0,
           radius: 1.75,
           descentRate: 0.3,
         }),
       );
-
-      this.spawnPolygon({
+      this.spawnPolygonSides({
         radius: obstacle.radius,
         gapIndex,
         polygon: pentagon,
       });
-
-      this.world.add(traits.ElapsedSeconds({ elapsedSeconds: 0 }));
-      this.world.add(traits.BeatIndex({ beatIndex: 0 }));
-      this.world.add(traits.BeatProximity({ beatProximity: 0 }));
-      this.world.add(traits.PlayerRotation({ playerRotation: 0.25 }));
     }
+
+    // init koota singletons
+    this.world.add(traits.ElapsedSeconds({ elapsedSeconds: 0 }));
+    this.world.add(traits.BeatIndex({ beatIndex: 0 }));
+    this.world.add(traits.BeatProximity({ beatProximity: 0 }));
+    this.world.add(traits.PlayerRotation({ playerRotation: 0.25 }));
+    this.world.add(traits.NextLevelEvent({ nextLevelEvent: 0 }));
 
     // original, non-koota fields
 
     this.startTimeMillis = deps.startTimeMillis;
     this.lastTimeMillis = deps.startTimeMillis;
     this.frameTimeMillis = 0.0;
-
-    this.obstacles = level.obstacles;
-    this.boxes = [];
 
     this.audioCtx = deps.audioCtx;
     this.musicGain = this.audioCtx.createGain();
@@ -189,7 +178,6 @@ class GameState {
     this.moonPos = vec3.create();
 
     this.beats = versusShapesJson.beats;
-    this.beatIndex = 0;
     this.beatProximity = 0;
 
     this.paused = false;
@@ -217,16 +205,16 @@ class GameState {
       this.world.set(traits.ElapsedSeconds, { elapsedSeconds });
 
       // advance beat index
-      let nextBeat = this.beats[this.beatIndex + 1];
+      let { beatIndex } = this.world.get(traits.BeatIndex)!;
+      let nextBeat = this.beats[beatIndex + 1];
       while (nextBeat < elapsedSeconds) {
-        this.beatIndex++;
-        nextBeat = this.beats[this.beatIndex + 1];
+        nextBeat = this.beats[++beatIndex + 1];
       }
-      this.world.set(traits.BeatIndex, { beatIndex: this.beatIndex });
+      this.world.set(traits.BeatIndex, { beatIndex });
 
       // set beat proximity
-      const beatBefore = this.beats[this.beatIndex];
-      const beatAfter = this.beats[this.beatIndex + 1];
+      const beatBefore = this.beats[beatIndex];
+      const beatAfter = this.beats[beatIndex + 1];
       let beatProximity: number;
       if (beatAfter !== undefined) {
         let beatDuration = beatAfter - beatBefore;
@@ -262,25 +250,28 @@ class GameState {
         pyramid.transform,
       );
 
-      // update obstacles: each active obstacle shrinks from its initial radius
-      // toward 0, then despawns once it reaches 0
-      this.boxes = [];
-      for (const o of this.obstacles) {
-        const age = elapsedSeconds - o.spawnTime;
-        // not spawned yet
-        if (age < 0) continue;
+      // spawn any unspawned obstacles from the level data for the current timestamp
+      let { nextLevelEvent } = this.world.get(traits.NextLevelEvent)!;
+      let nextEvent = level.events[nextLevelEvent];
+      while (nextEvent && nextEvent.atSeconds <= elapsedSeconds) {
+        const gapIndex = nextEvent.gapIndex % PENTA_SIDES;
+        const pentagon = this.world.spawn(
+          traits.Obstacle({
+            spawnTime: nextEvent.atSeconds,
+            gapIndex,
+            radius: 1.75,
+            descentRate: 0.3,
+          }),
+        );
+        this.spawnPolygonSides({
+          radius: nextEvent.radius,
+          gapIndex,
+          polygon: pentagon,
+        });
 
-        const radius = o.radius - age * o.descentRate;
-        // shrunk away -> despawned
-        if (radius <= 0) continue;
-
-        switch (o.type) {
-          case "pentagon": {
-            const pentagon = buildPentagon(radius, o.gapIndex % PENTA_SIDES);
-            this.boxes.push(...pentagon);
-          }
-        }
+        nextEvent = level.events[++nextLevelEvent];
       }
+      this.world.set(traits.NextLevelEvent, { nextLevelEvent });
 
       this.world
         .query(traits.Obstacle)
@@ -298,8 +289,7 @@ class GameState {
             .updateEach((_, sideEnt) => {
               sideEnt.destroy();
             });
-
-          this.spawnPolygon({
+          this.spawnPolygonSides({
             radius,
             gapIndex: obstacle.gapIndex % PENTA_SIDES,
             polygon: obstacleEnt,
@@ -380,7 +370,7 @@ class GameState {
     });
   }
 
-  spawnPolygon({
+  spawnPolygonSides({
     radius,
     gapIndex,
     polygon,

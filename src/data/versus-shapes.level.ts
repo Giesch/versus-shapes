@@ -1,10 +1,10 @@
 import { type Level } from '../level'
 
 export const level: Level = {
-  obstacles: [
+  events: [
     {
-      type: "pentagon",
-      spawnTime: 0,
+      type: 'spawnPentagon',
+      atSeconds: 5.990748405456543,
       gapIndex: 0,
       radius: 1.75,
       descentRate: 0.3

@@ -5,6 +5,7 @@
   - [X] use koota queries for draw() method?
   - [ ] look for other fields to move into koota
   - [ ] remove all newly unused fields
+  - [ ] move game logic into system functions that take a koota world
 
 - [ ] make the player a more normal entity
   ie avoid singletons

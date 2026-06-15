@@ -30,11 +30,18 @@ export const GPUPyramid = koota.trait({
 
 export const ElapsedSeconds = koota.trait({ elapsedSeconds: 0 });
 
+/**
+ * the index of the last beat timestamp that we've passed;
+ * we're between this one and the next
+ */
 export const BeatIndex = koota.trait({ beatIndex: 0 });
 export const BeatProximity = koota.trait({ beatProximity: 0 });
 
 /** the player's input rotation; 0.0 == 1.0 == pointing left */
 export const PlayerRotation = koota.trait({ playerRotation: 0 });
+
+/** the index of the next unexecuted event in the level data */
+export const NextLevelEvent = koota.trait({ nextLevelEvent: 0 });
 
 // RELATIONS
 
