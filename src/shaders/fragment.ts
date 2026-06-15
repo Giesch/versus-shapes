@@ -203,7 +203,7 @@ const pointLight = (
   );
   const specular = lightColor.mul(specularStrength * specIntensity);
 
-  return diffuse.add(specular).mul(intensity);
+  return diffuse.add(specular).mul(d.f32(intensity));
 };
 
 const basicLighting = (
