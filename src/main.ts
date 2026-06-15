@@ -113,11 +113,6 @@ class GameState {
   /** a dimmer fill light, kept exactly opposite the sun */
   moonPos: Vec3;
 
-  /** the player's input rotation; 0.0 == 1.0 == pointing left */
-  currentRotationTurns: number;
-  pyramidRollFrac: number;
-  pyramidTransform: Mat4;
-
   /** active obstacles loaded from the level data */
   obstacles: LevelObstacle[];
   boxes: ObstacleBox[];
@@ -170,6 +165,7 @@ class GameState {
       this.world.add(traits.ElapsedSeconds({ elapsedSeconds: 0 }));
       this.world.add(traits.BeatIndex({ beatIndex: 0 }));
       this.world.add(traits.BeatProximity({ beatProximity: 0 }));
+      this.world.add(traits.PlayerRotation({ playerRotation: 0.25 }));
     }
 
     // original, non-koota fields
@@ -177,10 +173,6 @@ class GameState {
     this.startTimeMillis = deps.startTimeMillis;
     this.lastTimeMillis = deps.startTimeMillis;
     this.frameTimeMillis = 0.0;
-
-    this.currentRotationTurns = 0.25;
-    this.pyramidRollFrac = 0.0;
-    this.pyramidTransform = mat4.create(0);
 
     this.obstacles = level.obstacles;
     this.boxes = [];
@@ -213,7 +205,9 @@ class GameState {
     // read spinner input
     // NOTE we need to avoid applying this input multiple times per render frame,
     // even if we want to run multiple fixed timesteps
-    this.currentRotationTurns += input.spinDelta * 0.01;
+    this.world.set(traits.PlayerRotation, ({ playerRotation }) => ({
+      playerRotation: playerRotation + input.spinDelta * 0.01,
+    }));
 
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       // timestep
@@ -233,6 +227,7 @@ class GameState {
       // set beat proximity
       const beatBefore = this.beats[this.beatIndex];
       const beatAfter = this.beats[this.beatIndex + 1];
+      let beatProximity: number;
       if (beatAfter !== undefined) {
         let beatDuration = beatAfter - beatBefore;
         let midpoint = beatBefore + beatDuration / 2;
@@ -240,27 +235,24 @@ class GameState {
           elapsedSeconds < midpoint
             ? elapsedSeconds - beatBefore
             : beatAfter - elapsedSeconds;
-        this.beatProximity = numerator / (beatDuration / 2);
+        beatProximity = numerator / (beatDuration / 2);
       } else {
-        this.beatProximity = 0;
+        beatProximity = 0;
       }
-      this.world.set(traits.BeatProximity, {
-        beatProximity: this.beatProximity,
-      });
+      this.world.set(traits.BeatProximity, { beatProximity });
 
       // time-based animation
-      this.pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
-
+      const pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
       // update player/pyramid orbit & rotation
+      const prox = this.world.get(traits.BeatProximity)!;
       const pyramidStart = mat4.translation(
-        vec3.create(1.15 - 0.5 + 0.1 * this.beatProximity, 0, 0),
+        vec3.create(1.15 - 0.5 + 0.1 * prox.beatProximity, 0, 0),
       );
       const pyramidUp = mat4.rotationZ(-Math.PI / 2);
-      const pyramidLocalRoll = mat4.rotationX(TAU * this.pyramidRollFrac);
+      const pyramidLocalRoll = mat4.rotationX(TAU * pyramidRollFrac);
       const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
-      const pyramidOrbitRotation = mat4.rotationZ(
-        TAU * this.currentRotationTurns,
-      );
+      const { playerRotation } = this.world.get(traits.PlayerRotation)!;
+      const pyramidOrbitRotation = mat4.rotationZ(TAU * playerRotation);
 
       const player = this.world.queryFirst(traits.IsPlayer)!;
       const pyramid = player.get(traits.GPUPyramid)!;
@@ -315,11 +307,6 @@ class GameState {
         });
 
       // check collision against every edge box
-
-      // // FIXME update pyramid height with beat proximity in an earlier step
-      // const { beatProximity } = this.world.get(traits.BeatProximity)!;
-      // const pyramidHeight = 0.2 + 0.025 * beatProximity;
-
       this.world
         .query(traits.IsPlayer, traits.GPUPyramid)
         .readEach(([pyramid]) => {

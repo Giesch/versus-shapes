@@ -33,6 +33,9 @@ export const ElapsedSeconds = koota.trait({ elapsedSeconds: 0 });
 export const BeatIndex = koota.trait({ beatIndex: 0 });
 export const BeatProximity = koota.trait({ beatProximity: 0 });
 
+/** the player's input rotation; 0.0 == 1.0 == pointing left */
+export const PlayerRotation = koota.trait({ playerRotation: 0 });
+
 // RELATIONS
 
 /** boxes belong to pentagons */

@@ -1,10 +1,13 @@
 #+title: Todo
 
 * Now
-- [ ] migrate to koota
-  - [ ] use koota queries for draw() method
+- [-] migrate to koota
+  - [X] use koota queries for draw() method?
+  - [ ] look for other fields to move into koota
+  - [ ] remove all newly unused fields
 
-  - [ ] remove original unused fields
+- [ ] make the player a more normal entity
+  ie avoid singletons
 
 - [-] now it's too bright on the CRT
   - [X] try re-darkening object colors
