@@ -12,7 +12,7 @@ export const RayMarchCamera = d.struct({
 
 export const RayMarchingParams = d.struct({
   camera: RayMarchCamera,
-  lightPosition: d.vec3f,
+  sunPosition: d.vec3f,
   moonPosition: d.vec3f,
   pyramidCount: d.u32,
   sphereCount: d.u32,

@@ -266,7 +266,7 @@ const sampleAt = (ndc: d.v2f): d.v3f => {
   return rayMarch(
     params.camera.position,
     dir,
-    params.lightPosition,
+    params.sunPosition,
     params.moonPosition,
   );
 };

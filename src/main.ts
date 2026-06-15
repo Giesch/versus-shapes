@@ -3,7 +3,13 @@ import "./style.css";
 import { PLAYER_1 } from "@rcade/plugin-input-classic";
 import * as spinners from "@rcade/plugin-input-spinners";
 
-import { Renderer, mat4x4fFromArray, type DrawArgs } from "./renderer";
+import {
+  Renderer,
+  mat4x4fFromArray,
+  toWebGPUVec2,
+  toWebGPUVec3,
+  type DrawArgs,
+} from "./renderer";
 import * as collision from "./collision";
 import * as audio from "./audio";
 import { mat4, vec3, type Vec3, type Mat4, vec2 } from "wgpu-matrix";
@@ -95,6 +101,7 @@ interface FrameInput {
 class GameState {
   paused: boolean;
 
+  // Timestep management
   /** the initial value of performance.now() at app start */
   startTimeMillis: number;
   /** the value of performance.now() at the top of the previous frame */
@@ -108,10 +115,15 @@ class GameState {
   renderer: Renderer;
   assets: Assets;
 
+  // lights
+
+  // TODO move into koota
   sunPos: Vec3;
   /** a dimmer fill light, kept exactly opposite the sun */
   moonPos: Vec3;
 
+  // beat tracking
+  // TODO move into koota
   /** the beat timestamps from essentia */
   beats: number[];
   beatProximity: number;
@@ -159,6 +171,9 @@ class GameState {
     this.world.add(traits.BeatProximity({ beatProximity: 0 }));
     this.world.add(traits.PlayerRotation({ playerRotation: 0.25 }));
     this.world.add(traits.NextLevelEvent({ nextLevelEvent: 0 }));
+    const sunPosition = vec3.clone<Float32Array>(SUN_START);
+    this.world.add(traits.SunPosition({ sunPosition }));
+    this.world.add(traits.MoonPosition({ moonPosition: vec3.create() }));
 
     // original, non-koota fields
 
@@ -197,11 +212,12 @@ class GameState {
       playerRotation: playerRotation + input.spinDelta * 0.01,
     }));
 
+    const elapsedSeconds = this.elapsedSeconds(input.now);
+
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       // timestep
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
-      const elapsedSeconds = this.elapsedSeconds(input.now);
       this.world.set(traits.ElapsedSeconds, { elapsedSeconds });
 
       // advance beat index
@@ -314,6 +330,13 @@ class GameState {
           });
         });
     }
+
+    // update light placement
+    const sunRotation = mat4.rotationY(TAU * elapsedSeconds * 0.1);
+    const { sunPosition } = this.world.get(traits.SunPosition)!;
+    vec3.transformMat4(SUN_START, sunRotation, sunPosition);
+    const { moonPosition } = this.world.get(traits.MoonPosition)!;
+    vec3.negate(this.sunPos, moonPosition);
   }
 
   elapsedSeconds(nowMillis: number): number {
@@ -327,18 +350,13 @@ class GameState {
     source.start();
   }
 
-  draw(now: number): void {
-    // place lights
-    const sunRotation = mat4.rotationY(TAU * this.elapsedSeconds(now) * 0.1);
-    vec3.transformMat4(SUN_START, sunRotation, this.sunPos);
-    vec3.negate(this.sunPos, this.moonPos);
-
+  draw(): void {
     const pyramids: DrawArgs["pyramids"] = [];
     this.world.query(traits.GPUPyramid).readEach(([p]) => {
       pyramids.push({
         transform: mat4x4fFromArray(p.transform),
-        radii: d.vec2f(p.radii[0], p.radii[1]),
-        color: d.vec3f(p.color[0], p.color[1], p.color[2]),
+        radii: toWebGPUVec2(p.radii),
+        color: toWebGPUVec3(p.color),
         height: p.height,
       });
     });
@@ -347,7 +365,7 @@ class GameState {
     this.world.query(traits.GPUBox).readEach(([b]) => {
       boxes.push({
         transform: mat4x4fFromArray(b.transform),
-        radii: d.vec3f(b.radii[0], b.radii[1], b.radii[2]),
+        radii: toWebGPUVec3(b.radii),
         color: d.vec3f(0.7, 0.3, 0.3),
       });
     });
@@ -360,10 +378,14 @@ class GameState {
       },
     ];
 
+    const { sunPosition } = this.world.get(traits.SunPosition)!;
+    const { moonPosition } = this.world.get(traits.MoonPosition)!;
+    const { elapsedSeconds } = this.world.get(traits.ElapsedSeconds)!;
+
     this.renderer.draw({
-      elapsedSeconds: this.elapsedSeconds(now),
-      lightPosition: this.sunPos,
-      moonPosition: this.moonPos,
+      elapsedSeconds,
+      sunPosition,
+      moonPosition,
       spheres,
       pyramids,
       boxes,
@@ -403,10 +425,14 @@ async function init() {
   game.playAudio(game.assets.versusShapes);
 
   const frame = () => {
-    const now = performance.now();
-    let spinDelta = spinners.PLAYER_1.SPINNER.consume_step_delta();
-    game.update({ now, spinDelta, playerOne: PLAYER_1 });
-    game.draw(now);
+    game.update({
+      now: performance.now(),
+      spinDelta: spinners.PLAYER_1.SPINNER.consume_step_delta(),
+      playerOne: PLAYER_1,
+    });
+
+    game.draw();
+
     requestAnimationFrame(frame);
   };
 

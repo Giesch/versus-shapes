@@ -1,4 +1,4 @@
-import { mat4, vec3, type Vec3 } from "wgpu-matrix";
+import { mat4, vec3, type Vec2, type Vec3 } from "wgpu-matrix";
 import tgpu, {
   type TgpuRoot,
   type TgpuRenderPipeline,
@@ -56,7 +56,7 @@ export interface RendererDeps {
 
 export interface DrawArgs {
   elapsedSeconds: number;
-  lightPosition: Vec3;
+  sunPosition: Vec3;
   moonPosition: Vec3;
   pyramids: d.Infer<typeof Pyramid>[];
   spheres: d.Infer<typeof Sphere>[];
@@ -222,7 +222,7 @@ export class Renderer {
   }
 
   public draw({
-    lightPosition,
+    sunPosition,
     moonPosition,
     pyramids,
     spheres,
@@ -243,11 +243,7 @@ export class Renderer {
         inverseViewProj: mat4x4fFromArray(this.invViewProj),
         position: d.vec3f(eye[0], eye[1], eye[2]),
       },
-      lightPosition: d.vec3f(
-        lightPosition[0],
-        lightPosition[1],
-        lightPosition[2],
-      ),
+      sunPosition: d.vec3f(sunPosition[0], sunPosition[1], sunPosition[2]),
       moonPosition: d.vec3f(moonPosition[0], moonPosition[1], moonPosition[2]),
       pyramidCount: pyramids.length,
       sphereCount: spheres.length,
@@ -285,8 +281,8 @@ function createSdfPipeline(
   });
 }
 
-export const mat4x4fFromArray = (arr: ArrayLike<number>) =>
-  d.mat4x4f(
+export function mat4x4fFromArray(arr: ArrayLike<number>): d.m4x4f {
+  return d.mat4x4f(
     arr[0],
     arr[1],
     arr[2],
@@ -304,3 +300,12 @@ export const mat4x4fFromArray = (arr: ArrayLike<number>) =>
     arr[14],
     arr[15],
   );
+}
+
+export function toWebGPUVec2(v: Vec2): d.v2f {
+  return d.vec2f(v[0], v[1]);
+}
+
+export function toWebGPUVec3(v: Vec3): d.v3f {
+  return d.vec3f(v[0], v[1], v[2]);
+}
