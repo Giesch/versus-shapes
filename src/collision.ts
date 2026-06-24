@@ -1,4 +1,5 @@
 import { mat4, vec3, type Vec3, type Mat4 } from "wgpu-matrix";
+import type { CPUBoxRecord, CPUPyramidRecord } from "./traits";
 
 // Port of fragment.ts:triangleSdf — unsigned distance from p to triangle abc
 function triangleSdf(p: Vec3, a: Vec3, b: Vec3, c: Vec3): number {
@@ -34,13 +35,12 @@ function triangleSdf(p: Vec3, a: Vec3, b: Vec3, c: Vec3): number {
 
 // Port of fragment.ts:pyramidSdf — signed distance from world point p to the pyramid.
 // transform is the world-to-local matrix (same convention as the GPU shader).
-function pyramidSdf(
-  p: Vec3,
-  transform: Mat4,
-  h: number,
-  rx: number,
-  rz: number,
-): number {
+function pyramidSdf(p: Vec3, pyramid: CPUPyramidRecord): number {
+  const transform = pyramid.transform;
+  const h = pyramid.height;
+  const rx = pyramid.radii[0];
+  const rz = pyramid.radii[1];
+
   const local = vec3.transformMat4(p, transform);
   const lx = Math.abs(local[0]);
   const ly = local[1];
@@ -88,15 +88,12 @@ function boxSdf(p: Vec3, transform: Mat4, radii: Vec3): number {
 }
 
 // World-space key points of the pyramid: apex + 4 base corners
-function pyramidKeyPoints(
-  transform: Mat4,
-  h: number,
-  rx: number,
-  rz: number,
-): Vec3[] {
-  const l2w = mat4.invert(transform);
+function pyramidKeyPoints(pyramid: CPUPyramidRecord): Vec3[] {
+  const rx = pyramid.radii[0];
+  const rz = pyramid.radii[1];
+  const l2w = mat4.invert(pyramid.transform);
   return [
-    vec3.transformMat4(vec3.create(0, h, 0), l2w),
+    vec3.transformMat4(vec3.create(0, pyramid.height, 0), l2w),
     vec3.transformMat4(vec3.create(rx, 0, rz), l2w),
     vec3.transformMat4(vec3.create(-rx, 0, rz), l2w),
     vec3.transformMat4(vec3.create(rx, 0, -rz), l2w),
@@ -122,39 +119,22 @@ function boxCorners(transform: Mat4, radii: Vec3): Vec3[] {
   ];
 }
 
-// True if the pyramid and sphere overlap.
-// Uses pyramidSdf(sphereCenter) <= sphereRadius, which is exact.
-export function pyramidVsSphere(
-  pyrTransform: Mat4,
-  pyrHeight: number,
-  pyrRx: number,
-  pyrRz: number,
-  sphCenter: Vec3,
-  sphRadius: number,
-): boolean {
-  return (
-    pyramidSdf(sphCenter, pyrTransform, pyrHeight, pyrRx, pyrRz) <= sphRadius
-  );
-}
-
 // True if the pyramid and box overlap.
 // Checks box corners inside pyramid and pyramid key points inside box.
 export function pyramidVsBox(
-  pyrTransform: Mat4,
-  pyrHeight: number,
-  pyrRx: number,
-  pyrRz: number,
-  boxTransform: Mat4,
-  boxRadii: Vec3,
+  pyramid: CPUPyramidRecord,
+  box: CPUBoxRecord,
 ): boolean {
-  for (const corner of boxCorners(boxTransform, boxRadii)) {
-    if (pyramidSdf(corner, pyrTransform, pyrHeight, pyrRx, pyrRz) <= 0) {
+  for (const boxCorner of boxCorners(box.transform, box.radii)) {
+    const distanceToCorner = pyramidSdf(boxCorner, pyramid);
+    if (distanceToCorner <= 0) {
       return true;
     }
   }
 
-  for (const pt of pyramidKeyPoints(pyrTransform, pyrHeight, pyrRx, pyrRz)) {
-    if (boxSdf(pt, boxTransform, boxRadii) <= 0) {
+  for (const keyPoint of pyramidKeyPoints(pyramid)) {
+    const distanceToKeyPoint = boxSdf(keyPoint, box.transform, box.radii);
+    if (distanceToKeyPoint <= 0) {
       return true;
     }
   }

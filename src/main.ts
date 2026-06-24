@@ -138,7 +138,7 @@ class GameState {
     // spawn player
     this.world.spawn(
       traits.IsPlayer,
-      traits.GPUPyramid({
+      traits.CPUPyramid({
         transform: mat4.create(),
         radii: vec2.create(0.075, 0.05),
         color: vec3.create(0.3, 0.7, 0.3),
@@ -240,7 +240,7 @@ class GameState {
       const pyramidOrbitRotation = mat4.rotationZ(TAU * playerRotation);
 
       const player = this.world.queryFirst(traits.IsPlayer)!;
-      const pyramid = player.get(traits.GPUPyramid)!;
+      const pyramid = player.get(traits.CPUPyramid)!;
       mat4.multiply(
         mat4.multiply(pyramidLocalRotation, pyramidStart),
         pyramidOrbitRotation,
@@ -282,7 +282,7 @@ class GameState {
 
           // completely recreate the sides
           this.world
-            .query(traits.GPUBox, traits.BelongsTo(obstacleEnt))
+            .query(traits.CPUBox, traits.BelongsTo(obstacleEnt))
             .updateEach((_, sideEnt) => {
               sideEnt.destroy();
             });
@@ -295,18 +295,10 @@ class GameState {
 
       // check collision against every edge box
       this.world
-        .query(traits.IsPlayer, traits.GPUPyramid)
+        .query(traits.IsPlayer, traits.CPUPyramid)
         .readEach(([pyramid]) => {
-          this.world.query(traits.GPUBox).readEach(([box]) => {
-            const collided = collision.pyramidVsBox(
-              pyramid.transform,
-              pyramid.height,
-              pyramid.radii[0],
-              pyramid.radii[1],
-              box.transform,
-              box.radii,
-            );
-
+          this.world.query(traits.CPUBox).readEach(([box]) => {
+            const collided = collision.pyramidVsBox(pyramid, box);
             this.paused ||= collided;
           });
         });
@@ -333,20 +325,20 @@ class GameState {
 
   draw(): void {
     const pyramids: DrawArgs["pyramids"] = [];
-    this.world.query(traits.GPUPyramid).readEach(([p]) => {
+    this.world.query(traits.CPUPyramid).readEach(([pyramid]) => {
       pyramids.push({
-        transform: mat4x4fFromArray(p.transform),
-        radii: toWebGPUVec2(p.radii),
-        color: toWebGPUVec3(p.color),
-        height: p.height,
+        transform: mat4x4fFromArray(pyramid.transform),
+        radii: toWebGPUVec2(pyramid.radii),
+        color: toWebGPUVec3(pyramid.color),
+        height: pyramid.height,
       });
     });
 
     const boxes: DrawArgs["boxes"] = [];
-    this.world.query(traits.GPUBox).readEach(([b]) => {
+    this.world.query(traits.CPUBox).readEach(([box]) => {
       boxes.push({
-        transform: mat4x4fFromArray(b.transform),
-        radii: toWebGPUVec3(b.radii),
+        transform: mat4x4fFromArray(box.transform),
+        radii: toWebGPUVec3(box.radii),
         color: d.vec3f(0.7, 0.3, 0.3),
       });
     });
@@ -379,7 +371,7 @@ class GameState {
     const sides = buildPentagon(radius, gapIndex);
     for (const { transform, radii } of sides) {
       this.world.spawn(
-        traits.GPUBox({ transform, radii }),
+        traits.CPUBox({ transform, radii }),
         traits.BelongsTo(polygon),
       );
     }

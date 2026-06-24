@@ -14,17 +14,19 @@ export const Obstacle = koota.trait({
 });
 
 /** the component sides of an obstacle */
-export const GPUBox = koota.trait({
+export const CPUBox = koota.trait({
   transform: () => mat4.create(),
   radii: () => vec3.create(),
 });
+export type CPUBoxRecord = koota.TraitRecord<typeof CPUBox>;
 
-export const GPUPyramid = koota.trait({
+export const CPUPyramid = koota.trait({
   transform: () => mat4.create(),
   radii: () => vec2.create(0.075, 0.05),
   color: () => vec3.create(0.3, 0.7, 0.3),
   height: 0,
 });
+export type CPUPyramidRecord = koota.TraitRecord<typeof CPUPyramid>;
 
 // SINGLETONS
 

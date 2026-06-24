@@ -237,6 +237,7 @@ export class Renderer {
     mat4.invert(viewProj, this.invViewProj);
 
     this.paramsBuffer.write({
+      resolution: d.vec2f(width, height),
       camera: {
         inverseViewProj: mat4x4fFromArray(this.invViewProj),
         position: toWebGPUVec3(eye),
@@ -246,7 +247,6 @@ export class Renderer {
       pyramidCount: pyramids.length,
       sphereCount: spheres.length,
       boxCount: boxes.length,
-      resolution: d.vec2f(width, height),
     });
 
     this.pyramidsBuffer.patch(pyramids);
