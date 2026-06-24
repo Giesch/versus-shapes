@@ -1,5 +1,6 @@
 import * as koota from "koota";
 import { mat4, vec2, vec3 } from "wgpu-matrix";
+import { d } from "typegpu";
 
 // ENTITY TRAITS
 
@@ -27,6 +28,13 @@ export const CPUPyramid = koota.trait({
   height: 0,
 });
 export type CPUPyramidRecord = koota.TraitRecord<typeof CPUPyramid>;
+
+export const GPUSphere = koota.trait({
+  radius: 0.5,
+  center: () => d.vec3f(0.0, 0.0, 0.0),
+  color: () => d.vec3f(0.3, 0.3, 0.7),
+});
+export type GPUSphereRecord = koota.TraitRecord<typeof GPUSphere>;
 
 // SINGLETONS
 

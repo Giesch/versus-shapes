@@ -24,7 +24,6 @@ import {
   BoxesArray,
   sdfLayout,
   PyramidsArray,
-  Sphere,
   Pyramid,
   Box,
 } from "./shaders/schemas";
@@ -59,7 +58,6 @@ export interface RendererDeps {
 export interface DrawArgs {
   world: koota.World;
   pyramids: d.Infer<typeof Pyramid>[];
-  spheres: d.Infer<typeof Sphere>[];
   boxes: d.Infer<typeof Box>[];
 }
 
@@ -221,7 +219,7 @@ export class Renderer {
     return renderer;
   }
 
-  public draw({ pyramids, spheres, boxes, world }: DrawArgs) {
+  public draw({ pyramids, boxes, world }: DrawArgs) {
     // TODO make these a more generic LightSource component
     const { sunPosition } = world.get(traits.SunPosition)!;
     const { moonPosition } = world.get(traits.MoonPosition)!;
@@ -235,6 +233,9 @@ export class Renderer {
     const proj = mat4.perspective(Math.PI / 4, aspect, 0.1, 1000);
     const viewProj = mat4.multiply(proj, view);
     mat4.invert(viewProj, this.invViewProj);
+
+    const spheres = collectShape(world, traits.GPUSphere);
+    this.spheresBuffer.patch(spheres);
 
     this.paramsBuffer.write({
       resolution: d.vec2f(width, height),
@@ -250,7 +251,6 @@ export class Renderer {
     });
 
     this.pyramidsBuffer.patch(pyramids);
-    this.spheresBuffer.patch(spheres);
     this.boxesBuffer.patch(boxes);
 
     this.pipeline
@@ -306,4 +306,17 @@ export function toWebGPUVec2(v: Vec2): d.v2f {
 
 export function toWebGPUVec3(v: Vec3): d.v3f {
   return d.vec3f(v[0], v[1], v[2]);
+}
+
+function collectShape<T extends koota.Trait>(
+  world: koota.World,
+  trait: T,
+): koota.TraitRecord<T>[] {
+  const shapes: koota.TraitRecord<T>[] = [];
+
+  world.query(trait).readEach(([shape]) => {
+    shapes.push(shape);
+  });
+
+  return shapes;
 }

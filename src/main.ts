@@ -135,6 +135,7 @@ class GameState {
     this.world = koota.createWorld();
     this.world.add(traits.BeatProximity({ beatProximity: 0 }));
 
+    // init koota entities
     // spawn player
     this.world.spawn(
       traits.IsPlayer,
@@ -143,6 +144,14 @@ class GameState {
         radii: vec2.create(0.075, 0.05),
         color: vec3.create(0.3, 0.7, 0.3),
         height: 0.2,
+      }),
+    );
+    // central sphere
+    this.world.spawn(
+      traits.GPUSphere({
+        radius: 0.5,
+        center: d.vec3f(0.0, 0.0, 0.0),
+        color: d.vec3f(0.3, 0.3, 0.7),
       }),
     );
 
@@ -343,19 +352,10 @@ class GameState {
       });
     });
 
-    const spheres = [
-      {
-        radius: 0.5,
-        center: d.vec3f(0.0, 0.0, 0.0),
-        color: d.vec3f(0.3, 0.3, 0.7),
-      },
-    ];
-
     this.renderer.draw({
-      spheres,
+      world: this.world,
       pyramids,
       boxes,
-      world: this.world,
     });
   }
 
