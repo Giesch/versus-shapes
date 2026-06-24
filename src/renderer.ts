@@ -239,10 +239,10 @@ export class Renderer {
     this.paramsBuffer.write({
       camera: {
         inverseViewProj: mat4x4fFromArray(this.invViewProj),
-        position: d.vec3f(eye[0], eye[1], eye[2]),
+        position: toWebGPUVec3(eye),
       },
-      sunPosition: d.vec3f(sunPosition[0], sunPosition[1], sunPosition[2]),
-      moonPosition: d.vec3f(moonPosition[0], moonPosition[1], moonPosition[2]),
+      sunPosition: toWebGPUVec3(sunPosition),
+      moonPosition: toWebGPUVec3(moonPosition),
       pyramidCount: pyramids.length,
       sphereCount: spheres.length,
       boxCount: boxes.length,
