@@ -24,8 +24,6 @@ import {
   BoxesArray,
   sdfLayout,
   PyramidsArray,
-  Pyramid,
-  Box,
 } from "./shaders/schemas";
 import { mainVertex } from "./shaders/vertex";
 import { mainFragment } from "./shaders/fragment";
@@ -57,8 +55,6 @@ export interface RendererDeps {
 
 export interface DrawArgs {
   world: koota.World;
-  pyramids: d.Infer<typeof Pyramid>[];
-  boxes: d.Infer<typeof Box>[];
 }
 
 export class Renderer {
@@ -219,7 +215,7 @@ export class Renderer {
     return renderer;
   }
 
-  public draw({ pyramids, boxes, world }: DrawArgs) {
+  public draw({ world }: DrawArgs) {
     // TODO make these a more generic LightSource component
     const { sunPosition } = world.get(traits.SunPosition)!;
     const { moonPosition } = world.get(traits.MoonPosition)!;
@@ -235,7 +231,12 @@ export class Renderer {
     mat4.invert(viewProj, this.invViewProj);
 
     const spheres = collectShape(world, traits.GPUSphere);
+    const boxes = collectShape(world, traits.GPUBox);
+    const pyramids = collectShape(world, traits.GPUPyramid);
+
     this.spheresBuffer.patch(spheres);
+    this.boxesBuffer.patch(boxes);
+    this.pyramidsBuffer.patch(pyramids);
 
     this.paramsBuffer.write({
       resolution: d.vec2f(width, height),
@@ -249,9 +250,6 @@ export class Renderer {
       sphereCount: spheres.length,
       boxCount: boxes.length,
     });
-
-    this.pyramidsBuffer.patch(pyramids);
-    this.boxesBuffer.patch(boxes);
 
     this.pipeline
       .withColorAttachment({

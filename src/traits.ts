@@ -1,6 +1,7 @@
 import * as koota from "koota";
 import { mat4, vec2, vec3 } from "wgpu-matrix";
 import { d } from "typegpu";
+import * as data from "typegpu/data";
 
 // ENTITY TRAITS
 
@@ -21,13 +22,27 @@ export const CPUBox = koota.trait({
 });
 export type CPUBoxRecord = koota.TraitRecord<typeof CPUBox>;
 
+export const GPUBox = koota.trait({
+  transform: () => data.mat4x4f(),
+  radii: () => data.vec3f(),
+  color: () => data.vec3f(),
+});
+export type GPUBoxRecord = koota.TraitRecord<typeof GPUBox>;
+
 export const CPUPyramid = koota.trait({
   transform: () => mat4.create(),
   radii: () => vec2.create(0.075, 0.05),
-  color: () => vec3.create(0.3, 0.7, 0.3),
   height: 0,
 });
 export type CPUPyramidRecord = koota.TraitRecord<typeof CPUPyramid>;
+
+export const GPUPyramid = koota.trait({
+  transform: () => data.mat4x4f(),
+  radii: () => data.vec2f(),
+  color: () => data.vec3f(),
+  height: 0,
+});
+export type GPUPyramidRecord = koota.TraitRecord<typeof GPUPyramid>;
 
 export const GPUSphere = koota.trait({
   radius: 0.5,

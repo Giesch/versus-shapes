@@ -8,7 +8,6 @@ import {
   mat4x4fFromArray,
   toWebGPUVec2,
   toWebGPUVec3,
-  type DrawArgs,
 } from "./renderer";
 import * as collision from "./collision";
 import * as audio from "./audio";
@@ -142,9 +141,9 @@ class GameState {
       traits.CPUPyramid({
         transform: mat4.create(),
         radii: vec2.create(0.075, 0.05),
-        color: vec3.create(0.3, 0.7, 0.3),
         height: 0.2,
       }),
+      traits.GPUPyramid({ color: d.vec3f(0.3, 0.7, 0.3) }),
     );
     // central sphere
     this.world.spawn(
@@ -333,30 +332,22 @@ class GameState {
   }
 
   draw(): void {
-    const pyramids: DrawArgs["pyramids"] = [];
-    this.world.query(traits.CPUPyramid).readEach(([pyramid]) => {
-      pyramids.push({
-        transform: mat4x4fFromArray(pyramid.transform),
-        radii: toWebGPUVec2(pyramid.radii),
-        color: toWebGPUVec3(pyramid.color),
-        height: pyramid.height,
+    this.world
+      .query(traits.CPUPyramid, traits.GPUPyramid)
+      .updateEach(([cpuPyramid, gpuPyramid]) => {
+        gpuPyramid.transform = mat4x4fFromArray(cpuPyramid.transform);
+        gpuPyramid.radii = toWebGPUVec2(cpuPyramid.radii);
+        gpuPyramid.height = cpuPyramid.height;
       });
-    });
 
-    const boxes: DrawArgs["boxes"] = [];
-    this.world.query(traits.CPUBox).readEach(([box]) => {
-      boxes.push({
-        transform: mat4x4fFromArray(box.transform),
-        radii: toWebGPUVec3(box.radii),
-        color: d.vec3f(0.7, 0.3, 0.3),
+    this.world
+      .query(traits.CPUBox, traits.GPUBox)
+      .updateEach(([cpuBox, gpuBox]) => {
+        gpuBox.transform = mat4x4fFromArray(cpuBox.transform);
+        gpuBox.radii = toWebGPUVec3(cpuBox.radii);
       });
-    });
 
-    this.renderer.draw({
-      world: this.world,
-      pyramids,
-      boxes,
-    });
+    this.renderer.draw({ world: this.world });
   }
 
   spawnPolygonSides({
@@ -372,6 +363,7 @@ class GameState {
     for (const { transform, radii } of sides) {
       this.world.spawn(
         traits.CPUBox({ transform, radii }),
+        traits.GPUBox({ color: d.vec3f(0.7, 0.3, 0.3) }),
         traits.BelongsTo(polygon),
       );
     }
