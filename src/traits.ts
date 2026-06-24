@@ -71,6 +71,7 @@ export const PlayerRotation = koota.trait({ playerRotation: 0 });
 /** the index of the next unexecuted event in the level data */
 export const NextLevelEvent = koota.trait({ nextLevelEvent: 0 });
 
+// TODO replace these with a LightSource trait
 export const SunPosition = koota.trait({ sunPosition: () => vec3.create() });
 export const MoonPosition = koota.trait({ moonPosition: () => vec3.create() });
 

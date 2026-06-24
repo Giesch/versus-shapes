@@ -9,14 +9,12 @@ import {
   toWebGPUVec2,
   toWebGPUVec3,
 } from "./renderer";
-import * as collision from "./collision";
 import * as audio from "./audio";
 import { mat4, vec3, type Vec3, type Mat4, vec2 } from "wgpu-matrix";
 import { d } from "typegpu";
 import * as koota from "koota";
 
 import versusShapesJson from "./data/versus-shapes.beats.json";
-import { level } from "./data/versus-shapes.level.ts";
 import * as traits from "./traits";
 import * as systems from "./systems";
 
@@ -114,13 +112,6 @@ class GameState {
   renderer: Renderer;
   assets: Assets;
 
-  // lights
-
-  // TODO move into koota as a gpu buffer of light sources
-  sunPos: Vec3;
-  /** a dimmer fill light, kept exactly opposite the sun */
-  moonPos: Vec3;
-
   world: koota.World;
 
   constructor(deps: GameStateDeps) {
@@ -172,31 +163,25 @@ class GameState {
     this.renderer = deps.renderer;
     this.assets = deps.assets;
 
-    this.sunPos = vec3.clone(SUN_START);
-    this.moonPos = vec3.create();
-
     this.paused = false;
   }
 
   update(input: FrameInput): void {
+    // TODO replace this with death screen & make restart-able
     if (this.paused) return;
 
+    // TODO move this timestep stuff into koota world
     const deltaTimeMillis = input.now - this.lastTimeMillis;
     this.frameTimeMillis += deltaTimeMillis;
     this.lastTimeMillis = input.now;
-
-    // read spinner input
-    // NOTE we need to avoid applying this input multiple times per render frame,
-    // even if we want to run multiple fixed timesteps
-    this.world.set(traits.PlayerRotation, ({ playerRotation }) => ({
-      playerRotation: playerRotation + input.spinDelta * 0.01,
-    }));
-
     const elapsedSeconds = (input.now - this.startTimeMillis) / 1000;
     this.world.set(traits.ElapsedSeconds, { elapsedSeconds });
 
+    // read input
+    systems.updatePlayerRotation(this.world, input.spinDelta);
+
+    // fixed timestep
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
-      // timestep
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
       systems.advanceBeatIndex(this.world);
@@ -204,69 +189,11 @@ class GameState {
 
       systems.updatePlayerPyramidPosition(this.world);
 
-      // spawn any unspawned obstacles from the level data for the current timestamp
-      let { nextLevelEvent } = this.world.get(traits.NextLevelEvent)!;
-      let nextEvent = level.events[nextLevelEvent];
-      while (nextEvent && nextEvent.atSeconds <= elapsedSeconds) {
-        const gapIndex = nextEvent.gapIndex % PENTA_SIDES;
-        const pentagon = this.world.spawn(
-          traits.Obstacle({
-            spawnTime: nextEvent.atSeconds,
-            gapIndex,
-            radius: 1.75,
-            descentRate: 0.3,
-          }),
-        );
-        this.spawnPolygonSides({
-          radius: nextEvent.radius,
-          gapIndex,
-          polygon: pentagon,
-        });
+      systems.spawnNewObstacles(this.world);
+      systems.recreateSidesForObstacles(this.world);
 
-        nextEvent = level.events[++nextLevelEvent];
-      }
-      this.world.set(traits.NextLevelEvent, { nextLevelEvent });
-
-      this.world
-        .query(traits.Obstacle)
-        .updateEach(([obstacle], obstacleEnt) => {
-          const age = elapsedSeconds - obstacle.spawnTime;
-          const radius = obstacle.radius - age * obstacle.descentRate;
-          if (radius <= 0) {
-            obstacleEnt.destroy();
-            return;
-          }
-
-          // completely recreate the sides
-          this.world
-            .query(traits.CPUBox, traits.BelongsTo(obstacleEnt))
-            .updateEach((_, sideEnt) => {
-              sideEnt.destroy();
-            });
-          this.spawnPolygonSides({
-            radius,
-            gapIndex: obstacle.gapIndex % PENTA_SIDES,
-            polygon: obstacleEnt,
-          });
-        });
-
-      // check collision against every edge box
-      this.world
-        .query(traits.IsPlayer, traits.CPUPyramid)
-        .readEach(([pyramid]) => {
-          this.world.query(traits.CPUBox).readEach(([box]) => {
-            const collided = collision.pyramidVsBox(pyramid, box);
-            this.paused ||= collided;
-          });
-        });
+      this.paused ||= systems.checkCollision(this.world);
     }
-
-    // update light placement
-    const sunRotation = mat4.rotationY(TAU * elapsedSeconds * 0.1);
-    const { sunPosition } = this.world.get(traits.SunPosition)!;
-    vec3.transformMat4(SUN_START, sunRotation, sunPosition);
-    const { moonPosition } = this.world.get(traits.MoonPosition)!;
-    vec3.negate(this.sunPos, moonPosition);
   }
 
   playAudio(buffer: AudioBuffer): void {
@@ -277,6 +204,15 @@ class GameState {
   }
 
   draw(): void {
+    // update light placement
+    const { elapsedSeconds } = this.world.get(traits.ElapsedSeconds)!;
+    const sunRotation = mat4.rotationY(TAU * elapsedSeconds * 0.1);
+    const { sunPosition } = this.world.get(traits.SunPosition)!;
+    vec3.transformMat4(SUN_START, sunRotation, sunPosition);
+    const { moonPosition } = this.world.get(traits.MoonPosition)!;
+    vec3.negate(sunPosition, moonPosition);
+
+    // copy object positions
     this.world
       .query(traits.CPUPyramid, traits.GPUPyramid)
       .updateEach(([cpuPyramid, gpuPyramid]) => {
@@ -284,7 +220,6 @@ class GameState {
         gpuPyramid.radii = toWebGPUVec2(cpuPyramid.radii);
         gpuPyramid.height = cpuPyramid.height;
       });
-
     this.world
       .query(traits.CPUBox, traits.GPUBox)
       .updateEach(([cpuBox, gpuBox]) => {
@@ -292,6 +227,7 @@ class GameState {
         gpuBox.radii = toWebGPUVec3(cpuBox.radii);
       });
 
+    // draw
     this.renderer.draw({ world: this.world });
   }
 
