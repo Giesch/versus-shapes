@@ -1,4 +1,5 @@
 import * as koota from "koota";
+import { mat4, vec3 } from "wgpu-matrix";
 
 import * as traits from "./traits";
 
@@ -38,4 +39,35 @@ export function setBeatProximity(world: koota.World) {
   }
 
   world.set(traits.BeatProximity, { beatProximity });
+}
+
+const TAU = Math.PI * 2;
+
+/** update player/pyramid orbit & rotation; including time-based bounce animation */
+export function updatePlayerPyramidPosition(world: koota.World) {
+  const { elapsedSeconds } = world.get(traits.ElapsedSeconds)!;
+  const { beatProximity } = world.get(traits.BeatProximity)!;
+
+  const pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
+  const bounce = 0.1 * beatProximity;
+  const pyramidStart = mat4.translation(vec3.create(1.15 - 0.5 + bounce, 0, 0));
+
+  const pyramidUp = mat4.rotationZ(-Math.PI / 2);
+  const pyramidLocalRoll = mat4.rotationX(TAU * pyramidRollFrac);
+  const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
+  const { playerRotation } = world.get(traits.PlayerRotation)!;
+  const pyramidOrbitRotation = mat4.rotationZ(TAU * playerRotation);
+
+  const player = world.queryFirst(traits.IsPlayer)!;
+  const pyramid = player.get(traits.CPUPyramid)!;
+
+  mat4.multiply(
+    mat4.multiply(pyramidLocalRotation, pyramidStart),
+    pyramidOrbitRotation,
+    pyramid.transform,
+  );
+}
+
+function frac(num: number): number {
+  return num - Math.floor(num);
 }

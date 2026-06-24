@@ -24,7 +24,6 @@ const MILLIS_PER_FRAME = 16.6;
 
 const TAU = Math.PI * 2;
 const SUN_START = vec3.create(4, 5, 2);
-const frac = (x: number): number => x - Math.floor(x);
 
 // pentagon obstacle: 5 boxes forming the polygon outline (one box per edge)
 const PENTA_SIDES = 5;
@@ -203,26 +202,7 @@ class GameState {
       systems.advanceBeatIndex(this.world);
       systems.setBeatProximity(this.world);
 
-      // time-based animation
-      const pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
-      // update player/pyramid orbit & rotation
-      const prox = this.world.get(traits.BeatProximity)!;
-      const pyramidStart = mat4.translation(
-        vec3.create(1.15 - 0.5 + 0.1 * prox.beatProximity, 0, 0),
-      );
-      const pyramidUp = mat4.rotationZ(-Math.PI / 2);
-      const pyramidLocalRoll = mat4.rotationX(TAU * pyramidRollFrac);
-      const pyramidLocalRotation = mat4.multiply(pyramidUp, pyramidLocalRoll);
-      const { playerRotation } = this.world.get(traits.PlayerRotation)!;
-      const pyramidOrbitRotation = mat4.rotationZ(TAU * playerRotation);
-
-      const player = this.world.queryFirst(traits.IsPlayer)!;
-      const pyramid = player.get(traits.CPUPyramid)!;
-      mat4.multiply(
-        mat4.multiply(pyramidLocalRotation, pyramidStart),
-        pyramidOrbitRotation,
-        pyramid.transform,
-      );
+      systems.updatePlayerPyramidPosition(this.world);
 
       // spawn any unspawned obstacles from the level data for the current timestamp
       let { nextLevelEvent } = this.world.get(traits.NextLevelEvent)!;
