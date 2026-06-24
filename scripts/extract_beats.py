@@ -30,7 +30,6 @@ def write_beats_json(audio_path_str):
         'beats_intervals': beats_intervals.tolist(),
     }
 
-    # TODO write to a different path in src?
     json_path = audio_path_str.replace('mp3', 'beats.json').replace('public', 'src/data')
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(json_beats, f, ensure_ascii=False, indent=4)

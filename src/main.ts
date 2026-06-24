@@ -18,6 +18,7 @@ import * as koota from "koota";
 import versusShapesJson from "./data/versus-shapes.beats.json";
 import { level } from "./data/versus-shapes.level.ts";
 import * as traits from "./traits";
+import * as systems from "./systems";
 
 const MILLIS_PER_FRAME = 16.6;
 
@@ -116,26 +117,30 @@ class GameState {
 
   // lights
 
-  // TODO move into koota
+  // TODO move into koota as a gpu buffer of light sources
   sunPos: Vec3;
   /** a dimmer fill light, kept exactly opposite the sun */
   moonPos: Vec3;
 
-  // beat tracking
-  // TODO move into koota
-  /** the beat timestamps from essentia */
-  beats: number[];
-  beatProximity: number;
-
   world: koota.World;
 
   constructor(deps: GameStateDeps) {
-    // koota world
     this.world = koota.createWorld();
-    this.world.add(traits.BeatProximity({ beatProximity: 0 }));
 
-    // init koota entities
-    // spawn player
+    // init koota singletons
+    this.world.add(traits.ElapsedSeconds({ elapsedSeconds: 0 }));
+    this.world.add(traits.BeatIndex({ beatIndex: 0 }));
+    this.world.add(traits.BeatProximity({ beatProximity: 0 }));
+    const beatTimestamps = versusShapesJson.beats;
+    this.world.add(traits.BeatTimestamps({ beatTimestamps }));
+    this.world.add(traits.PlayerRotation({ playerRotation: 0.25 }));
+    this.world.add(traits.NextLevelEvent({ nextLevelEvent: 0 }));
+    const sunPosition = vec3.clone<Float32Array>(SUN_START);
+    this.world.add(traits.SunPosition({ sunPosition }));
+    this.world.add(traits.MoonPosition({ moonPosition: vec3.create() }));
+
+    // spawn koota entities
+    // player pyramid
     this.world.spawn(
       traits.IsPlayer,
       traits.CPUPyramid({
@@ -154,16 +159,6 @@ class GameState {
       }),
     );
 
-    // init koota singletons
-    this.world.add(traits.ElapsedSeconds({ elapsedSeconds: 0 }));
-    this.world.add(traits.BeatIndex({ beatIndex: 0 }));
-    this.world.add(traits.BeatProximity({ beatProximity: 0 }));
-    this.world.add(traits.PlayerRotation({ playerRotation: 0.25 }));
-    this.world.add(traits.NextLevelEvent({ nextLevelEvent: 0 }));
-    const sunPosition = vec3.clone<Float32Array>(SUN_START);
-    this.world.add(traits.SunPosition({ sunPosition }));
-    this.world.add(traits.MoonPosition({ moonPosition: vec3.create() }));
-
     // non-koota fields
     // timestep
     this.startTimeMillis = deps.startTimeMillis;
@@ -180,9 +175,6 @@ class GameState {
 
     this.sunPos = vec3.clone(SUN_START);
     this.moonPos = vec3.create();
-
-    this.beats = versusShapesJson.beats;
-    this.beatProximity = 0;
 
     this.paused = false;
   }
@@ -201,38 +193,15 @@ class GameState {
       playerRotation: playerRotation + input.spinDelta * 0.01,
     }));
 
-    const elapsedSeconds = this.elapsedSeconds(input.now);
+    const elapsedSeconds = (input.now - this.startTimeMillis) / 1000;
+    this.world.set(traits.ElapsedSeconds, { elapsedSeconds });
 
     while (this.frameTimeMillis >= MILLIS_PER_FRAME) {
       // timestep
       this.frameTimeMillis -= MILLIS_PER_FRAME;
 
-      this.world.set(traits.ElapsedSeconds, { elapsedSeconds });
-
-      // advance beat index
-      let { beatIndex } = this.world.get(traits.BeatIndex)!;
-      let nextBeat = this.beats[beatIndex + 1];
-      while (nextBeat < elapsedSeconds) {
-        nextBeat = this.beats[++beatIndex + 1];
-      }
-      this.world.set(traits.BeatIndex, { beatIndex });
-
-      // set beat proximity
-      const beatBefore = this.beats[beatIndex];
-      const beatAfter = this.beats[beatIndex + 1];
-      let beatProximity: number;
-      if (beatAfter !== undefined) {
-        let beatDuration = beatAfter - beatBefore;
-        let midpoint = beatBefore + beatDuration / 2;
-        let numerator =
-          elapsedSeconds < midpoint
-            ? elapsedSeconds - beatBefore
-            : beatAfter - elapsedSeconds;
-        beatProximity = numerator / (beatDuration / 2);
-      } else {
-        beatProximity = 0;
-      }
-      this.world.set(traits.BeatProximity, { beatProximity });
+      systems.advanceBeatIndex(this.world);
+      systems.setBeatProximity(this.world);
 
       // time-based animation
       const pyramidRollFrac = frac(2 * 0.1 * elapsedSeconds);
@@ -318,10 +287,6 @@ class GameState {
     vec3.transformMat4(SUN_START, sunRotation, sunPosition);
     const { moonPosition } = this.world.get(traits.MoonPosition)!;
     vec3.negate(this.sunPos, moonPosition);
-  }
-
-  elapsedSeconds(nowMillis: number): number {
-    return (nowMillis - this.startTimeMillis) / 1000;
   }
 
   playAudio(buffer: AudioBuffer): void {

@@ -60,7 +60,10 @@ export const ElapsedSeconds = koota.trait({ elapsedSeconds: 0 });
  * we're between this one and the next
  */
 export const BeatIndex = koota.trait({ beatIndex: 0 });
+/** how close we are to the nearest on-beat timestamp; 0-1 */
 export const BeatProximity = koota.trait({ beatProximity: 0 });
+/** the array of precalculated timestamps for the track */
+export const BeatTimestamps = koota.trait({ beatTimestamps: () => [0] });
 
 /** the player's input rotation; 0.0 == 1.0 == pointing left */
 export const PlayerRotation = koota.trait({ playerRotation: 0 });
