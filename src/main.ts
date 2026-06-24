@@ -146,25 +146,6 @@ class GameState {
       }),
     );
 
-    // spawn pentagon
-    for (const obstacle of level.events.filter((o) => o.atSeconds === 0)) {
-      const gapIndex = obstacle.gapIndex % PENTA_SIDES;
-
-      const pentagon = this.world.spawn(
-        traits.Obstacle({
-          spawnTime: obstacle.atSeconds,
-          gapIndex: 0,
-          radius: 1.75,
-          descentRate: 0.3,
-        }),
-      );
-      this.spawnPolygonSides({
-        radius: obstacle.radius,
-        gapIndex,
-        polygon: pentagon,
-      });
-    }
-
     // init koota singletons
     this.world.add(traits.ElapsedSeconds({ elapsedSeconds: 0 }));
     this.world.add(traits.BeatIndex({ beatIndex: 0 }));
@@ -175,12 +156,12 @@ class GameState {
     this.world.add(traits.SunPosition({ sunPosition }));
     this.world.add(traits.MoonPosition({ moonPosition: vec3.create() }));
 
-    // original, non-koota fields
-
+    // non-koota fields
+    // timestep
     this.startTimeMillis = deps.startTimeMillis;
     this.lastTimeMillis = deps.startTimeMillis;
     this.frameTimeMillis = 0.0;
-
+    // audio
     this.audioCtx = deps.audioCtx;
     this.musicGain = this.audioCtx.createGain();
     this.musicGain.gain.value = 1.2;
