@@ -8,7 +8,9 @@ import tgpu, {
   type StorageFlag,
 } from "typegpu";
 import * as d from "typegpu/data";
+import * as koota from "koota";
 
+import * as traits from "./traits";
 import {
   clearRecoverableError,
   quitIfWebGPUNotAvailableOrMissingFeatures,
@@ -55,9 +57,7 @@ export interface RendererDeps {
 }
 
 export interface DrawArgs {
-  elapsedSeconds: number;
-  sunPosition: Vec3;
-  moonPosition: Vec3;
+  world: koota.World;
   pyramids: d.Infer<typeof Pyramid>[];
   spheres: d.Infer<typeof Sphere>[];
   boxes: d.Infer<typeof Box>[];
@@ -221,13 +221,11 @@ export class Renderer {
     return renderer;
   }
 
-  public draw({
-    sunPosition,
-    moonPosition,
-    pyramids,
-    spheres,
-    boxes,
-  }: DrawArgs) {
+  public draw({ pyramids, spheres, boxes, world }: DrawArgs) {
+    // TODO make these a more generic LightSource component
+    const { sunPosition } = world.get(traits.SunPosition)!;
+    const { moonPosition } = world.get(traits.MoonPosition)!;
+
     const width = this.canvas.width;
     const height = this.canvas.height;
     const aspect = width / Math.max(1, height);

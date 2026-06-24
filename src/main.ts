@@ -359,17 +359,11 @@ class GameState {
       },
     ];
 
-    const { sunPosition } = this.world.get(traits.SunPosition)!;
-    const { moonPosition } = this.world.get(traits.MoonPosition)!;
-    const { elapsedSeconds } = this.world.get(traits.ElapsedSeconds)!;
-
     this.renderer.draw({
-      elapsedSeconds,
-      sunPosition,
-      moonPosition,
       spheres,
       pyramids,
       boxes,
+      world: this.world,
     });
   }
 
